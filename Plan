@@ -35,3 +35,5 @@ Add algo for next entry while reading
 Post diffing
     - Check last sync with peer and only ask for later received_at entries
     - Send an Bloom filter of everything after the last sync
+
+Add compression to db

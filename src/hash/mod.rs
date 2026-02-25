@@ -1,16 +1,15 @@
-mod keys;
-
 use std::fmt::Display;
 
 use base64::{Engine as _, engine::general_purpose::STANDARD_NO_PAD};
-use serde::{Deserialize, Deserializer, Serialize, Serializer};
+use serde::{Deserialize, Serialize};
 use sha2::Digest;
 
-pub use keys::{PrivateKey, PublicKey, Signable, Signature};
-use serde::de::Error as DeError;
-use surrealdb_types::{Bytes, SerializationError, SurrealValue};
+use surrealdb_types::{SerializationError, SurrealValue};
 
 use crate::errors::Base64Error;
+
+mod keys;
+pub use keys::{PrivateKey, PublicKey, Signable, Signature};
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, byteable_derive::Byteable)]
 pub struct Hash(#[serde(with = "serde_bytes")] [u8; 64]);

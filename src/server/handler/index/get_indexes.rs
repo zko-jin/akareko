@@ -1,7 +1,9 @@
 use crate::{
     db::{
-        Index, IndexTag, NoTag, Repositories,
-        index::{IndexRepository, MangaTag},
+        index::{
+            Index,
+            tags::{IndexTag, MangaTag, NoTag},
+        },
         user::I2PAddress,
     },
     hash::Hash,
@@ -18,7 +20,7 @@ impl AuroraProtocolCommand for GetIndexes {
     async fn process(
         req: Self::RequestPayload,
         state: &ServerState,
-        address: &I2PAddress,
+        _: &I2PAddress,
     ) -> AuroraProtocolResponse<Self::ResponsePayload, Self::ResponseData> {
         match req.tag.as_str() {
             MangaTag::TAG => {

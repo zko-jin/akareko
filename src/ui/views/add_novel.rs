@@ -4,13 +4,10 @@ use iced::{
 };
 
 use crate::{
-    db::{
-        Index, Repositories,
-        index::{IndexRepository, MangaTag},
-    },
+    db::index::{Index, tags::MangaTag},
     ui::{
         AppState, Message,
-        views::{View, ViewMessage, novel_list::NovelListView},
+        views::{View, ViewMessage, novel_list::MangaListView},
     },
 };
 
@@ -43,11 +40,11 @@ impl AddNovelView {
         Subscription::none()
     }
 
-    pub fn on_enter(state: &mut AppState) -> Task<Message> {
+    pub fn on_enter(_: &mut AppState) -> Task<Message> {
         Task::none()
     }
 
-    pub fn view(&self, state: &AppState) -> iced::Element<Message> {
+    pub fn view(&self, _: &AppState) -> iced::Element<'_, Message> {
         column![
             text_input("Title", &self.title).on_input(|s| AddNovelMessage::UpdateTitle(s).into()),
             button(text("Add Novel")).on_press(AddNovelMessage::AddNovel.into())
@@ -74,7 +71,7 @@ impl AddNovelView {
                 }
                 AddNovelMessage::SavedNovel => {
                     v.title = String::new();
-                    return Task::done(Message::ChangeView(View::NovelList(NovelListView::new())));
+                    return Task::done(Message::ChangeView(View::NovelList(MangaListView::new())));
                 }
             }
         }

@@ -1,13 +1,7 @@
-use tokio::io::{AsyncRead, AsyncWrite};
-
 use crate::{
-    db::{
-        Repositories,
-        user::{I2PAddress, User, UserRepository},
-    },
-    errors::{DecodeError, EncodeError},
-    hash::{PrivateKey, Signable, Signature},
-    helpers::{Byteable, now_timestamp},
+    db::user::{I2PAddress, User},
+    hash::{PrivateKey, Signature},
+    helpers::now_timestamp,
     server::{
         ServerState,
         handler::{AuroraProtocolCommand, users::UserResponse},
@@ -24,7 +18,7 @@ impl AuroraProtocolCommand for Who {
     type ResponseData = ();
 
     async fn process(
-        req: Self::RequestPayload,
+        _: Self::RequestPayload,
         state: &ServerState,
         address: &I2PAddress,
     ) -> AuroraProtocolResponse<Self::ResponsePayload, Self::ResponseData> {

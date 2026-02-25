@@ -5,10 +5,7 @@ use iced::{
 use rclite::Arc;
 
 use crate::{
-    db::{
-        Repositories,
-        user::{I2PAddress, TrustLevel, User, UserRepository},
-    },
+    db::user::{I2PAddress, TrustLevel, User},
     errors::ClientError,
     ui::{
         AppState, Message,
@@ -52,7 +49,7 @@ impl AddWhoModal {
         }
     }
 
-    pub fn view(&self, state: &AppState) -> iced::Element<Message> {
+    pub fn view(&self, _: &AppState) -> iced::Element<'_, Message> {
         if self.loading {
             return text("Loading...").into();
         }

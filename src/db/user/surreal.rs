@@ -1,8 +1,8 @@
-use rand::seq::{IteratorRandom, SliceRandom};
+use rand::seq::IteratorRandom;
 use surrealdb::{Surreal, engine::local::Db, types::RecordId};
 use tracing::info;
 
-use crate::{errors::DatabaseError, hash::PublicKey};
+use crate::{db::user::TrustLevel, errors::DatabaseError, hash::PublicKey};
 
 use super::User;
 
@@ -64,10 +64,23 @@ impl<'a> UserRepository<'a> {
         Ok(results)
     }
 
-    pub async fn get_random_user(&self) -> Result<User, DatabaseError> {
-        let results: Vec<User> = self.db.select("users").await.unwrap();
-        let user = results.into_iter().choose(&mut rand::thread_rng());
-        user.ok_or(DatabaseError::Unknown)
+    pub async fn get_random_users(
+        &self,
+        min_trust: TrustLevel,
+        take: usize,
+    ) -> Result<Vec<User>, DatabaseError> {
+        const QUERY: &'static str =
+            "SELECT * FROM users WHERE trust >= $min_trust ORDER BY RANDOM() LIMIT $take";
+
+        let results: Vec<User> = self
+            .db
+            .query(QUERY)
+            .bind(("min_trust", min_trust))
+            .bind(("take", take))
+            .await?
+            .take(0)?;
+
+        Ok(results)
     }
 
     pub async fn get_all_users(&self) -> Vec<User> {

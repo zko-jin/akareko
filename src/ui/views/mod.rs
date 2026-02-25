@@ -13,12 +13,12 @@ use iced::Task;
 use crate::ui::{
     AppState, Message,
     views::{
-        add_chapter::{AddNovelChapterMessage, AddNovelChapterView},
+        add_chapter::{AddMangaChapterMessage, AddMangaChapterView},
         add_novel::{AddNovelMessage, AddNovelView},
         home::{HomeMessage, HomeView},
         image_viewer::{ImageViewerMessage, ImageViewerView},
         novel::{NovelMessage, NovelView},
-        novel_list::{NovelListMessage, NovelListView},
+        novel_list::{MangaListView, NovelListMessage},
         post::{PostMessage, PostView},
         settings::{SettingsMessage, SettingsView},
         user_list::{UserListMessage, UserListView},
@@ -28,10 +28,10 @@ use crate::ui::{
 #[derive(Debug, Clone)]
 pub enum View {
     Home(HomeView),
-    NovelList(NovelListView),
+    NovelList(MangaListView),
     Novel(NovelView),
     AddNovel(AddNovelView),
-    AddChapter(AddNovelChapterView),
+    AddChapter(AddMangaChapterView),
     Settings(SettingsView),
     ImageViewer(ImageViewerView),
     UserList(UserListView),
@@ -44,7 +44,7 @@ pub enum ViewMessage {
     NovelList(NovelListMessage),
     Novel(NovelMessage),
     AddNovel(AddNovelMessage),
-    AddChapter(AddNovelChapterMessage),
+    AddChapter(AddMangaChapterMessage),
     Settings(SettingsMessage),
     ImageViewer(ImageViewerMessage),
     UserList(UserListMessage),
@@ -55,10 +55,10 @@ impl View {
     pub fn on_enter(state: &mut AppState) -> Task<Message> {
         match state.view {
             View::Home(_) => HomeView::on_enter(state),
-            View::NovelList(_) => NovelListView::on_enter(state),
+            View::NovelList(_) => MangaListView::on_enter(state),
             View::Novel(_) => NovelView::on_enter(state),
             View::AddNovel(_) => AddNovelView::on_enter(state),
-            View::AddChapter(_) => AddNovelChapterView::on_enter(state),
+            View::AddChapter(_) => AddMangaChapterView::on_enter(state),
             View::Settings(_) => SettingsView::on_enter(state),
             View::ImageViewer(_) => ImageViewerView::on_enter(state),
             View::UserList(_) => UserListView::on_enter(state),
@@ -83,10 +83,10 @@ impl View {
     pub fn update(message: ViewMessage, state: &mut AppState) -> Task<Message> {
         match message {
             ViewMessage::Home(m) => HomeView::update(m, state),
-            ViewMessage::NovelList(m) => NovelListView::update(m, state),
+            ViewMessage::NovelList(m) => MangaListView::update(m, state),
             ViewMessage::Novel(m) => NovelView::update(m, state),
             ViewMessage::AddNovel(m) => AddNovelView::update(m, state),
-            ViewMessage::AddChapter(m) => AddNovelChapterView::update(m, state),
+            ViewMessage::AddChapter(m) => AddMangaChapterView::update(m, state),
             ViewMessage::Settings(m) => SettingsView::update(m, state),
             ViewMessage::ImageViewer(m) => ImageViewerView::update(m, state),
             ViewMessage::UserList(m) => UserListView::update(m, state),

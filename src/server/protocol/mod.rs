@@ -1,5 +1,3 @@
-use std::marker::PhantomData;
-
 use tokio::io::{AsyncRead, AsyncReadExt, AsyncWrite, AsyncWriteExt};
 
 use crate::{
@@ -7,8 +5,6 @@ use crate::{
     helpers::Byteable,
     server::handler::AuroraProtocolCommand,
 };
-
-pub mod byteable;
 
 #[repr(u8)]
 #[derive(Debug, Clone, byteable_derive::Byteable)]

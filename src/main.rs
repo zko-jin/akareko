@@ -1,9 +1,6 @@
 #![allow(dead_code)]
 
-use std::rc::Rc;
-
 use iced::Task;
-use iced::Theme;
 use tracing::info;
 use tracing_subscriber::EnvFilter;
 use tracing_subscriber::Layer;
@@ -12,7 +9,6 @@ use tracing_subscriber::layer::SubscriberExt;
 use tracing_subscriber::util::SubscriberInitExt;
 
 use crate::config::AuroraConfig;
-use crate::db::Repositories;
 
 use crate::ui::AppState;
 use crate::ui::Message;
@@ -24,12 +20,6 @@ mod hash;
 mod helpers;
 mod server;
 mod ui;
-
-#[cfg(feature = "sqlite")]
-mod embedded {
-    use refinery::embed_migrations;
-    embed_migrations!("./migrations/sqlite");
-}
 
 fn main() -> Result<(), ()> {
     let format = time::format_description::parse("[hour]:[minute]:[second]").expect("Cataplum");
@@ -44,6 +34,7 @@ fn main() -> Result<(), ()> {
         .with_target(false)
         .with_timer(timer)
         .with_filter(filter);
+
     tracing_subscriber::registry().with(stdout_log).init();
 
     info!("Initializing Application...");

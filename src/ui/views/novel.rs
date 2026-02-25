@@ -1,25 +1,33 @@
 use anawt::{AnawtTorrentStatus, InfoHash, TorrentState};
 use iced::{
     Color, Element, Length, Subscription, Task,
-    widget::{Column, button, image, progress_bar, row, svg, text},
+    widget::{Column, button, progress_bar, row, svg, text},
 };
 use tokio::sync::watch;
 use tracing::info;
 
 use crate::{
-    db::{Content, Index, IndexTag, comments::Topic, index::MangaTag},
-    hash::Hash,
+    db::{
+        comments::Topic,
+        index::{
+            Index,
+            content::Content,
+            tags::{IndexTag as _, MangaTag},
+        },
+    },
     helpers::SanitizedString,
     ui::{
         AppState, Message,
         icons::{CHAT_ICON, CHECK_CIRCLE_ICON, DOWNLOAD_ICON, SEEN_ICON, UNSEEN_ICON},
         style,
         views::{
-            View, ViewMessage, add_chapter::AddNovelChapterView, image_viewer::ImageViewerView,
+            View, ViewMessage, add_chapter::AddMangaChapterView, image_viewer::ImageViewerView,
             post::PostView,
         },
     },
 };
+
+// ==================== End Imports ====================
 
 #[derive(Debug, Clone)]
 pub struct NovelView {
@@ -71,13 +79,13 @@ impl NovelView {
         Subscription::none()
     }
 
-    pub fn view(&self, state: &AppState) -> iced::Element<Message> {
+    pub fn view(&self, _: &AppState) -> iced::Element<'_, Message> {
         let mut column: Vec<iced::Element<Message>> = vec![text(self.novel.title().clone()).into()];
 
         column.push(
             button(text("Add Chapter"))
                 .on_press(Message::ChangeView(View::AddChapter(
-                    AddNovelChapterView::new(self.novel.clone()),
+                    AddMangaChapterView::new(self.novel.clone()),
                 )))
                 .into(),
         );
@@ -109,7 +117,7 @@ impl NovelView {
                         svg(svg::Handle::from_memory(DOWNLOAD_ICON))
                             .height(Length::Fixed(24.0))
                             .width(Length::Fixed(24.0))
-                            .style(|t, _| svg::Style {
+                            .style(|_, _| svg::Style {
                                 color: Some(Color::WHITE),
                             }),
                     )
@@ -168,7 +176,7 @@ impl NovelView {
                                 svg(svg::Handle::from_memory(UNSEEN_ICON))
                                     .height(Length::Fixed(24.0))
                                     .width(Length::Fixed(24.0))
-                                    .style(|t, _| svg::Style {
+                                    .style(|_, _| svg::Style {
                                         color: Some(Color::WHITE),
                                     }),
                             )
@@ -179,7 +187,7 @@ impl NovelView {
                                 svg(svg::Handle::from_memory(SEEN_ICON))
                                     .height(Length::Fixed(24.0))
                                     .width(Length::Fixed(24.0))
-                                    .style(|t, _| svg::Style {
+                                    .style(|_, _| svg::Style {
                                         color: Some(Color::WHITE),
                                     }),
                             )
@@ -190,7 +198,7 @@ impl NovelView {
                             svg(svg::Handle::from_memory(CHAT_ICON))
                                 .height(Length::Fixed(24.0))
                                 .width(Length::Fixed(24.0))
-                                .style(|t, _| svg::Style {
+                                .style(|_, _| svg::Style {
                                     color: Some(Color::WHITE),
                                 }),
                         )

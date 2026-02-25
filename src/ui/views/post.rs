@@ -1,17 +1,16 @@
-use std::{collections::HashSet, num::NonZero};
+use std::collections::HashSet;
 
 use iced::{
     Subscription, Task,
     widget::{
-        Column, Row, button, row, text,
+        Column, Row, button, text,
         text_editor::{self, Content},
     },
 };
 
 use crate::{
     db::{
-        PaginateResponse,
-        comments::{Post, PostRepository, Topic},
+        comments::{Post, Topic},
         user::User,
     },
     helpers::now_timestamp,

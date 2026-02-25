@@ -6,15 +6,12 @@ use tracing::info;
 
 use crate::{
     config::AuroraConfig,
-    db::{
-        Repositories,
-        user::{I2PAddress, TrustLevel, User},
-    },
+    db::user::{TrustLevel, User},
     helpers::now_timestamp,
     ui::{
         AppState, Message,
         components::toast::{Toast, ToastType},
-        views::{NovelListView, View, ViewMessage},
+        views::{View, ViewMessage},
     },
 };
 
@@ -64,7 +61,7 @@ impl SettingsView {
         Task::none()
     }
 
-    pub fn view(&self, state: &AppState) -> iced::Element<'_, Message> {
+    pub fn view(&self, _: &AppState) -> iced::Element<'_, Message> {
         let pub_key = self.config.public_key().to_base64();
 
         let priv_key = self.config.private_key().to_base64();

@@ -1,8 +1,6 @@
-#![allow(non_upper_case_globals)]
+#![allow(unused_variables)]
 
 use std::string::FromUtf8Error;
-
-use thiserror::Error;
 
 use crate::server::protocol::AuroraStatus;
 

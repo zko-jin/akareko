@@ -5,8 +5,12 @@ use iced::{
 
 use crate::{
     db::{
-        Content, ContentEntry, Index, Magnet,
-        index::{MangaChapter, MangaTag},
+        Magnet,
+        index::{
+            Index,
+            content::{Content, ContentEntry},
+            tags::{MangaChapter, MangaTag},
+        },
     },
     helpers::{Language, now_timestamp},
     ui::{
@@ -23,14 +27,14 @@ struct ContentEntryValues {
 }
 
 #[derive(Debug, Clone)]
-pub struct AddNovelChapterView {
+pub struct AddMangaChapterView {
     novel: Index<MangaTag>,
     magnet: String,
     entries: Vec<ContentEntryValues>,
 }
 
 #[derive(Debug, Clone)]
-pub enum AddNovelChapterMessage {
+pub enum AddMangaChapterMessage {
     AddContent,
 
     UpdateTitle(String, usize),
@@ -43,13 +47,13 @@ pub enum AddNovelChapterMessage {
     SavedContent,
 }
 
-impl From<AddNovelChapterMessage> for Message {
-    fn from(m: AddNovelChapterMessage) -> Self {
+impl From<AddMangaChapterMessage> for Message {
+    fn from(m: AddMangaChapterMessage) -> Self {
         Message::ViewMessage(ViewMessage::AddChapter(m))
     }
 }
 
-impl AddNovelChapterView {
+impl AddMangaChapterView {
     pub fn new(novel: Index<MangaTag>) -> Self {
         Self {
             novel,
@@ -62,11 +66,11 @@ impl AddNovelChapterView {
         Subscription::none()
     }
 
-    pub fn on_enter(state: &mut AppState) -> Task<Message> {
+    pub fn on_enter(_: &mut AppState) -> Task<Message> {
         Task::none()
     }
 
-    pub fn view(&self, state: &AppState) -> iced::Element<Message> {
+    pub fn view(&self, _: &AppState) -> iced::Element<'_, Message> {
         let entries = self
             .entries
             .iter()
@@ -74,10 +78,10 @@ impl AddNovelChapterView {
             .map(|(i, e)| {
                 column![
                     text_input("Title", &e.title)
-                        .on_input(move |s| AddNovelChapterMessage::UpdateTitle(s, i).into())
+                        .on_input(move |s| AddMangaChapterMessage::UpdateTitle(s, i).into())
                         .width(iced::Length::Fill),
                     text_input("Path", &e.path)
-                        .on_input(move |s| AddNovelChapterMessage::UpdatePath(s, i).into())
+                        .on_input(move |s| AddMangaChapterMessage::UpdatePath(s, i).into())
                         .width(iced::Length::Fill)
                 ]
                 .into()
@@ -88,25 +92,25 @@ impl AddNovelChapterView {
 
         column![
             text_input("Magnet", &self.magnet)
-                .on_input(|s| AddNovelChapterMessage::UpdateMagnet(s).into()),
+                .on_input(|s| AddMangaChapterMessage::UpdateMagnet(s).into()),
             center(row![
-                button(text("+")).on_press(AddNovelChapterMessage::AddEntry.into()),
+                button(text("+")).on_press(AddMangaChapterMessage::AddEntry.into()),
                 button(text("-")).on_press_maybe(match self.entries.len() {
                     0 => None,
-                    _ => Some(AddNovelChapterMessage::RemoveEntry(self.entries.len() - 1).into()),
+                    _ => Some(AddMangaChapterMessage::RemoveEntry(self.entries.len() - 1).into()),
                 }),
             ],)
             .height(iced::Length::Shrink),
             entries_column,
-            button(text("Add Chapter")).on_press(AddNovelChapterMessage::AddContent.into())
+            button(text("Add Chapter")).on_press(AddMangaChapterMessage::AddContent.into())
         ]
         .into()
     }
 
-    pub fn update(m: AddNovelChapterMessage, state: &mut AppState) -> Task<Message> {
+    pub fn update(m: AddMangaChapterMessage, state: &mut AppState) -> Task<Message> {
         if let View::AddChapter(v) = &mut state.view {
             match m {
-                AddNovelChapterMessage::AddContent => {
+                AddMangaChapterMessage::AddContent => {
                     if let Some(repositories) = &state.repositories {
                         let index_hash = v.novel.hash().clone();
 
@@ -139,29 +143,29 @@ impl AddNovelChapterView {
                                     println!("Error adding chapter: {}", e);
                                 }
                             }
-                            AddNovelChapterMessage::SavedContent.into()
+                            AddMangaChapterMessage::SavedContent.into()
                         });
                     }
                 }
-                AddNovelChapterMessage::UpdateTitle(title, i) => {
+                AddMangaChapterMessage::UpdateTitle(title, i) => {
                     v.entries[i].title = title;
                 }
-                AddNovelChapterMessage::UpdateEnumeration(enumeration, i) => {
+                AddMangaChapterMessage::UpdateEnumeration(enumeration, i) => {
                     v.entries[i].enumeration = enumeration;
                 }
-                AddNovelChapterMessage::UpdatePath(path, i) => {
+                AddMangaChapterMessage::UpdatePath(path, i) => {
                     v.entries[i].path = path;
                 }
-                AddNovelChapterMessage::UpdateMagnet(magnet) => {
+                AddMangaChapterMessage::UpdateMagnet(magnet) => {
                     v.magnet = magnet;
                 }
-                AddNovelChapterMessage::AddEntry => {
+                AddMangaChapterMessage::AddEntry => {
                     v.entries.push(ContentEntryValues::default());
                 }
-                AddNovelChapterMessage::RemoveEntry(i) => {
+                AddMangaChapterMessage::RemoveEntry(i) => {
                     v.entries.remove(i);
                 }
-                AddNovelChapterMessage::SavedContent => {
+                AddMangaChapterMessage::SavedContent => {
                     v.entries = vec![];
                     v.magnet = String::new();
                     return Task::done(Message::ChangeView(View::Novel(NovelView::new(

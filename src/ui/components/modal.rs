@@ -3,12 +3,9 @@ use iced::{
     widget::{center, container, mouse_area, opaque, stack, text},
 };
 
-use crate::{
-    db::Repositories,
-    ui::{
-        AppState, Message,
-        components::modal::add_who::{AddWhoModal, AddWhoModalMessage},
-    },
+use crate::ui::{
+    AppState, Message,
+    components::modal::add_who::{AddWhoModal, AddWhoModalMessage},
 };
 
 pub mod add_who;

@@ -1,15 +1,19 @@
-use std::marker::PhantomData;
-
-use serde::{Deserialize, Serialize};
+use const_format::formatcp;
+use fastbloom::BloomFilter;
 use surrealdb::{Surreal, engine::local::Db, types::RecordId};
-use surrealdb_types::SurrealValue;
+use surrealdb_types::Value;
 use tracing::info;
 
 use crate::{
-    db::{Content, Index, IndexTag},
+    db::{
+        Content, Timestamp,
+        index::{Index, IndexTag},
+    },
     errors::DatabaseError,
-    hash::{Hash, PublicKey, Signature},
+    hash::{Hash, PublicKey},
 };
+
+// ==================== End Imports ====================
 
 pub struct IndexRepository<'a> {
     db: &'a Surreal<Db>,
@@ -37,7 +41,7 @@ impl<'a> IndexRepository<'a> {
     ) -> Result<Content<T>, DatabaseError> {
         let created: Result<Option<Content<T>>, surrealdb::Error> = self
             .db
-            .upsert((T::CONTENT_TABLE, content.signature.as_base64()))
+            .upsert((T::CONTENT_TABLE, content.signature().as_base64()))
             .content(content)
             .await;
 
@@ -53,10 +57,37 @@ impl<'a> IndexRepository<'a> {
         }
     }
 
-    pub async fn get_all_indexes<T: IndexTag>(&self) -> Result<Vec<Index<T>>, DatabaseError> {
-        let results: Vec<Index<T>> = self.db.select(T::TAG).await?;
+    pub async fn get_all_indexes<T: IndexTag>(
+        &self,
+        timestamp: Timestamp,
+        filter: Option<BloomFilter>,
+    ) -> Result<Vec<Index<T>>, DatabaseError> {
+        let query = format!(
+            "SELECT * FROM {} {};",
+            T::TAG,
+            if timestamp != 0 {
+                "WHERE timestamp >= $timestamp"
+            } else {
+                ""
+            }
+        );
 
-        Ok(results)
+        let results: Vec<Index<T>> = self
+            .db
+            .query(query)
+            .bind(("timestamp", timestamp))
+            .await?
+            .take(0)?;
+
+        let filtered_indexes = match filter {
+            Some(filter) => results
+                .into_iter()
+                .filter(|i| !filter.contains(i))
+                .collect(),
+            None => results,
+        };
+
+        Ok(filtered_indexes)
     }
 
     pub async fn get_indexes<T: IndexTag>(
@@ -91,6 +122,7 @@ impl<'a> IndexRepository<'a> {
             "SELECT * FROM {} WHERE index_hash = $index_hash",
             T::CONTENT_TABLE
         );
+
         let chapters: Vec<Content<T>> = self
             .db
             .query(query)

@@ -1,9 +1,6 @@
-use iced::{
-    Background, Border, Color, Theme,
-    widget::{button, container::rounded_box},
-};
+use iced::{Color, Theme, widget::button};
 
-pub fn icon_button(theme: &Theme, status: button::Status) -> button::Style {
+pub fn icon_button(_: &Theme, _: button::Status) -> button::Style {
     button::Style {
         // background: Some(Color::TRANSPARENT.into()),
         background: None,

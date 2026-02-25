@@ -3,13 +3,10 @@ use iced::{
     widget::{button, column, text},
 };
 
-use crate::{
-    db::Repositories,
-    ui::{
-        AppState, Message,
-        components::modal::{Modal, add_who::AddWhoModal},
-        views::{NovelListView, View, settings::SettingsView, user_list::UserListView},
-    },
+use crate::ui::{
+    AppState, Message,
+    components::modal::{Modal, add_who::AddWhoModal},
+    views::{MangaListView, View, settings::SettingsView, user_list::UserListView},
 };
 
 #[derive(Debug, Clone)]
@@ -27,14 +24,14 @@ impl HomeView {
         Subscription::none()
     }
 
-    pub fn on_enter(state: &mut AppState) -> Task<Message> {
+    pub fn on_enter(_: &mut AppState) -> Task<Message> {
         Task::none()
     }
 
-    pub fn view(&self, state: &AppState) -> iced::Element<Message> {
+    pub fn view(&self, _: &AppState) -> iced::Element<'_, Message> {
         column![
             button(text("Novels"))
-                .on_press(Message::ChangeView(View::NovelList(NovelListView::new()))),
+                .on_press(Message::ChangeView(View::NovelList(MangaListView::new()))),
             button(text("Settings"))
                 .on_press(Message::ChangeView(View::Settings(SettingsView::new()))),
             button(text("Add user"))
@@ -52,7 +49,7 @@ impl HomeView {
         .into()
     }
 
-    pub fn update(m: HomeMessage, state: &mut AppState) -> Task<Message> {
+    pub fn update(_: HomeMessage, _: &mut AppState) -> Task<Message> {
         Task::none()
     }
 }

@@ -1,34 +1,40 @@
-use std::{fmt::Debug, marker::PhantomData};
+use std::fmt::Debug;
 
 use rclite::Arc;
 
-use serde::{Deserialize, Deserializer, Serialize};
+use serde::{Deserialize, Serialize};
 use surrealdb::{
     Surreal,
     engine::local::{Db, SurrealKv},
-    types::RecordId,
 };
-use surrealdb_types::{RecordIdKey, SurrealValue};
+use surrealdb_types::SurrealValue;
 use tokio::{
-    io::{AsyncRead, AsyncReadExt, AsyncWrite, AsyncWriteExt},
+    io::{AsyncRead, AsyncWrite},
     sync::RwLock,
 };
 use tracing::info;
 
+use crate::db::{comments::PostRepository, follow_index::IndexFollowRepository};
 #[cfg(feature = "surrealdb")]
-use crate::db::comments::PostRepository;
+use crate::errors::DatabaseError;
 use crate::{
     config::AuroraConfig,
     db::{
-        index::{IndexRepository, MangaTag, TaggedContent},
+        index::IndexRepository,
         user::{User, UserRepository},
     },
-    errors::{DatabaseError, DecodeError, EncodeError},
-    hash::{Hash, PrivateKey, PublicKey, Signature},
-    helpers::{Byteable, SanitizedString, now_timestamp},
+    errors::{DecodeError, EncodeError},
+    helpers::{Byteable, now_timestamp},
+};
+use crate::{
+    db::index::content::Content,
+    hash::{Hash, PublicKey},
 };
 
+// ==================== End Imports ====================
+
 pub mod comments;
+pub mod follow_index;
 pub mod index;
 pub mod user;
 
@@ -126,6 +132,11 @@ impl Repositories {
     }
 }
 
+const CACHE_TABLE: &'static str = "cache";
+fn cache_index_key(index_hash: &Hash, user: &PublicKey) -> String {
+    format!("{}_{}", index_hash.as_base64(), user.to_base64())
+}
+
 #[cfg(feature = "surrealdb")]
 impl Repositories {
     pub async fn initialize(config: Arc<RwLock<AuroraConfig>>) -> Self {
@@ -160,27 +171,67 @@ impl Repositories {
         repositories
     }
 
-    pub async fn get_random_contents(
+    // pub async fn get_random_contents(
+    //     &self,
+    //     count: u16,
+    // ) -> Result<Vec<TaggedContent>, DatabaseError> {
+    //     let mut tagged_contents = Vec::with_capacity(count as usize);
+
+    //     let novel_tag = count;
+
+    //     let novels: Vec<Content<MangaTag>> = self
+    //         .db
+    //         .query(format!(
+    //             "SELECT * FROM {} ORDER BY rand() LIMIT $count",
+    //             MangaTag::CONTENT_TABLE
+    //         ))
+    //         .bind(("count", novel_tag))
+    //         .await?
+    //         .take(0)?;
+
+    //     tagged_contents.extend(novels.into_iter().map(TaggedContent::from));
+
+    //     Ok(tagged_contents)
+    // }
+
+    pub async fn add_cache_index(
         &self,
-        count: u16,
-    ) -> Result<Vec<TaggedContent>, DatabaseError> {
-        let mut tagged_contents = Vec::with_capacity(count as usize);
-
-        let novel_tag = count;
-
-        let novels: Vec<Content<MangaTag>> = self
+        index_hash: &Hash,
+        user: &PublicKey,
+        timestamp: Timestamp,
+    ) -> Result<(), DatabaseError> {
+        let _: Option<surrealdb_types::Value> = self
             .db
-            .query(format!(
-                "SELECT * FROM {} ORDER BY rand() LIMIT $count",
-                MangaTag::CONTENT_TABLE
+            .upsert(surrealdb_types::RecordId::new(
+                CACHE_TABLE,
+                cache_index_key(index_hash, user),
             ))
-            .bind(("count", novel_tag))
+            .content(timestamp)
+            .await?;
+
+        Ok(())
+    }
+
+    pub async fn check_cache_index(
+        &self,
+        index_hash: &Hash,
+        user: &PublicKey,
+    ) -> Result<Timestamp, DatabaseError> {
+        const QUERY: &'static str =
+            const_format::formatcp!("SELECT * FROM {}:$cache;", CACHE_TABLE);
+
+        let results: Vec<Timestamp> = self
+            .db
+            .query(QUERY)
+            .bind(("cache", cache_index_key(index_hash, user)))
             .await?
             .take(0)?;
 
-        tagged_contents.extend(novels.into_iter().map(TaggedContent::from));
-
-        Ok(tagged_contents)
+        match results.len() {
+            0 => Ok(0),
+            1 => Ok(results.into_iter().next().unwrap()),
+            _ => Err(DatabaseError::Unknown),
+        }
     }
 
     pub async fn user(&self) -> UserRepository<'_> {
@@ -194,457 +245,42 @@ impl Repositories {
     pub async fn posts(&self) -> PostRepository<'_> {
         PostRepository::new(&self.db)
     }
-}
 
-#[derive(Debug, Clone, Serialize, Deserialize, SurrealValue)]
-pub struct ContentEntry<T: IndexTag> {
-    pub title: String,
-    pub enumeration: f32,
-    pub path: String,
-    pub content: T::Content,
-
-    // Metadata
-    #[serde(skip)]
-    pub progress: f32,
-}
-
-impl<T: IndexTag> ToBytes for ContentEntry<T> {
-    fn to_bytes(&self) -> Vec<u8> {
-        let mut bytes: Vec<u8> = self.title.as_bytes().to_vec();
-        bytes.extend(self.enumeration.to_be_bytes());
-        bytes.extend(self.path.as_bytes());
-        bytes.extend(self.content.to_bytes());
-        bytes
+    pub async fn index_follow(&self) -> IndexFollowRepository<'_> {
+        IndexFollowRepository::new(&self.db)
     }
 }
 
-impl<T: IndexTag> Byteable for ContentEntry<T> {
-    async fn encode<W: AsyncWrite + Unpin + Send>(
-        &self,
-        writer: &mut W,
-    ) -> Result<(), EncodeError> {
-        self.title.encode(writer).await?;
-        self.enumeration.encode(writer).await?;
-        self.path.encode(writer).await?;
-        self.content.encode(writer).await?;
-        Ok(())
-    }
+#[cfg(feature = "surrealdb")]
+mod surreal {
+    use std::marker::PhantomData;
+    use surrealdb_types::SurrealValue;
 
-    async fn decode<R: AsyncRead + Unpin + Send>(reader: &mut R) -> Result<Self, DecodeError>
-    where
-        Self: Sized,
-    {
-        Ok(ContentEntry {
-            title: String::decode(reader).await?,
-            enumeration: f32::decode(reader).await?,
-            path: String::decode(reader).await?,
-            content: T::Content::decode(reader).await?,
-            progress: 0.0,
-        })
-    }
-}
+    #[derive(Debug, Clone)]
+    pub struct SurrealPhantom<T>(PhantomData<T>);
 
-#[derive(Debug, Clone, SurrealValue)]
-pub struct Content<T: IndexTag> {
-    #[surreal(rename = "id")]
-    signature: Signature,
-    source: PublicKey,
-
-    // Signed Fields
-    index_hash: Hash,
-    pub timestamp: Timestamp,
-    pub magnet_link: Magnet,
-    entries: Vec<ContentEntry<T>>,
-}
-
-// impl<T: IndexTag> SurrealValue for Content<T> {
-//     fn kind_of() -> surrealdb_types::Kind {
-//         surrealdb_types::Kind::Object
-//     }
-
-//     fn into_value(self) -> surrealdb_types::Value {
-//         let mut obj = surrealdb_types::Object::new();
-//         obj.insert(
-//             "id",
-//             RecordId::new(
-//                 T::CONTENT_TABLE,
-//                 RecordIdKey::String(self.signature.as_base64()),
-//             ),
-//         );
-//         obj.insert("source", self.source);
-//         obj.insert("index_hash", self.index_hash);
-//         obj.insert("timestamp", self.timestamp);
-//         obj.insert("magnet_link", self.magnet_link);
-//         obj.insert("entries", self.entries);
-
-//         obj.into()
-//     }
-
-//     fn from_value(value: surrealdb_types::Value) -> Result<Self, surrealdb::Error>
-//     where
-//         Self: Sized,
-//     {
-//         let obj = value.as_object().unwrap();
-//         let id = obj.get("id").unwrap().as_record().unwrap();
-//         let source = PublicKey::from_value(obj.get("source").unwrap().clone());
-//         let index_hash = obj.get("index_hash").unwrap().as_hash().unwrap();
-//         let timestamp = obj.get("timestamp").unwrap().as_i64().unwrap() as u64;
-//         let magnet_link = obj.get("magnet_link").unwrap().as_magnet().unwrap();
-//         let entries = obj.get("entries").unwrap().as_array().unwrap();
-
-//         Ok(Self {
-//             signature: Signature::from_base64(&id.key().to_string()).unwrap(),
-//             source,
-//             index_hash,
-//             timestamp,
-//             magnet_link,
-//             entries: entries
-//                 .iter()
-//                 .map(|entry| ContentEntry::<T>::from_value(entry.clone()).unwrap())
-//                 .collect(),
-//         })
-//     }
-// }
-
-// #[cfg(feature = "surrealdb")]
-// fn deserialize_signature_id<'de, D>(deserializer: D) -> Result<Signature, D::Error>
-// where
-//     D: Deserializer<'de>,
-// {
-//     let id = RecordId::deserialize(deserializer)?;
-//     let key = id.key().to_string();
-//     let trimmed = key.trim_start_matches("`").trim_end_matches("`");
-
-//     Ok(Signature::from_base64(&trimmed).unwrap())
-// }
-
-impl<T: IndexTag> Content<T> {
-    pub fn new(
-        signature: Signature,
-        source: PublicKey,
-        index_hash: Hash,
-        timestamp: Timestamp,
-        magnet_link: Magnet,
-        entries: Vec<ContentEntry<T>>,
-    ) -> Self {
-        Self {
-            signature,
-            source,
-            index_hash,
-            timestamp,
-            magnet_link,
-            entries,
+    impl<T> Default for SurrealPhantom<T> {
+        fn default() -> Self {
+            Self(Default::default())
         }
     }
 
-    pub fn id_bytes(
-        index_hash: &Hash,
-        timestamp: &Timestamp,
-        magnet_link: &Magnet,
-        entries: &Vec<ContentEntry<T>>,
-    ) -> Vec<u8> {
-        let mut bytes: Vec<u8> = index_hash.inner().to_vec().to_vec();
-        bytes.extend(timestamp.to_be_bytes());
-        bytes.extend(magnet_link.0.as_bytes());
-        for entry in entries {
-            bytes.extend(entry.to_bytes());
+    impl<T> SurrealValue for SurrealPhantom<T> {
+        fn kind_of() -> surrealdb_types::Kind {
+            surrealdb_types::Kind::None
         }
-        bytes
-    }
 
-    pub fn new_signed(
-        source: PublicKey,
-        index_hash: Hash,
-        timestamp: Timestamp,
-        magnet_link: Magnet,
-        entries: Vec<ContentEntry<T>>,
-        priv_key: &PrivateKey,
-    ) -> Self {
-        let to_sign = Self::id_bytes(&index_hash, &timestamp, &magnet_link, &entries);
-        let signature = priv_key.sign(&to_sign);
+        fn into_value(self) -> surrealdb_types::Value {
+            surrealdb_types::Value::None
+        }
 
-        Self::new(
-            signature,
-            source,
-            index_hash,
-            timestamp,
-            magnet_link,
-            entries,
-        )
-    }
-
-    pub fn verify(&self) -> bool {
-        let to_verify = Self::id_bytes(
-            &self.index_hash,
-            &self.timestamp,
-            &self.magnet_link,
-            &self.entries,
-        );
-        self.source.verify(&to_verify, &self.signature)
-    }
-
-    pub fn signature(&self) -> &Signature {
-        &self.signature
-    }
-
-    pub fn entries(&self) -> &Vec<ContentEntry<T>> {
-        &self.entries
-    }
-
-    pub fn update_entry_progress(&mut self, index: usize, progress: f32) {
-        self.entries[index].progress = progress;
-    }
-
-    pub fn index_hash(&self) -> &Hash {
-        &self.index_hash
-    }
-}
-
-impl<T: IndexTag> Byteable for Content<T> {
-    async fn encode<W: AsyncWrite + Unpin + Send>(
-        &self,
-        writer: &mut W,
-    ) -> Result<(), EncodeError> {
-        self.signature.encode(writer).await?;
-        self.source.encode(writer).await?;
-        self.index_hash.encode(writer).await?;
-        self.timestamp.encode(writer).await?;
-        self.magnet_link.encode(writer).await?;
-        self.entries.encode(writer).await?;
-        Ok(())
-    }
-
-    async fn decode<R: AsyncRead + Unpin + Send>(reader: &mut R) -> Result<Self, DecodeError> {
-        Ok(Content {
-            signature: Signature::decode(reader).await?,
-            source: PublicKey::decode(reader).await?,
-            index_hash: Hash::decode(reader).await?,
-            timestamp: Timestamp::decode(reader).await?,
-            magnet_link: Magnet::decode(reader).await?,
-            entries: Vec::decode(reader).await?,
-        })
-    }
-}
-
-#[derive(Debug, Clone, SurrealValue)]
-pub struct Index<T: IndexTag> {
-    hash: Hash, // Primary Key
-    title: String,
-    release_date: i32,
-    source: PublicKey,
-    signature: Signature,
-    #[surreal(skip, default)]
-    _phantom: SurrealPhantom<T>,
-}
-
-impl Index<NoTag> {
-    pub fn make_tagged<T: IndexTag>(self) -> Index<T> {
-        // SAFETY: They're literally the same type, just different tags
-        unsafe { std::mem::transmute(self) }
-    }
-}
-
-#[derive(Debug, Clone)]
-pub struct SurrealPhantom<T>(PhantomData<T>);
-
-impl<T> Default for SurrealPhantom<T> {
-    fn default() -> Self {
-        Self(Default::default())
-    }
-}
-
-impl<T> SurrealValue for SurrealPhantom<T> {
-    fn kind_of() -> surrealdb_types::Kind {
-        surrealdb_types::Kind::None
-    }
-
-    fn into_value(self) -> surrealdb_types::Value {
-        surrealdb_types::Value::None
-    }
-
-    fn from_value(value: surrealdb_types::Value) -> Result<Self, surrealdb::Error>
-    where
-        Self: Sized,
-    {
-        return Ok(SurrealPhantom(PhantomData));
-    }
-}
-
-#[derive(Debug, Clone)]
-pub struct NoTag;
-impl IndexTag for NoTag {
-    const TAG: &'static str = "";
-
-    const CONTENT_TABLE: &'static str = "";
-
-    type Content = ();
-}
-
-// impl<T: IndexTag, R: IndexTag> From<Index<T>> for Index<R> {
-//     fn from(index: Index<T>) -> Self {
-//         // SAFETY: They're literally the same type, just different tags
-//         unsafe { std::mem::transmute(index) }
-//     }
-// }
-
-pub trait IndexTag: Send + Clone + Debug {
-    const TAG: &'static str; // Acts like table name
-    const CONTENT_TABLE: &'static str;
-    type Content: Send
-        + Serialize
-        + for<'de> Deserialize<'de>
-        + Clone
-        + Debug
-        + ToBytes
-        + Byteable
-        + SurrealValue;
-}
-
-impl<T: IndexTag> Index<T> {
-    pub fn new(title: String, release_date: i32, source: PublicKey, signature: Signature) -> Self {
-        let hash = Hash::digest(&Self::id_bytes(&title, &release_date));
-
-        Self {
-            hash,
-            title,
-            release_date,
-            source,
-            signature,
-            _phantom: SurrealPhantom(PhantomData),
+        fn from_value(_: surrealdb_types::Value) -> Result<Self, surrealdb::Error>
+        where
+            Self: Sized,
+        {
+            return Ok(SurrealPhantom(PhantomData));
         }
     }
-
-    pub fn transmute<T2: IndexTag>(self) -> Index<T2> {
-        Index {
-            hash: self.hash,
-            title: self.title,
-            release_date: self.release_date,
-            source: self.source,
-            signature: self.signature,
-            _phantom: SurrealPhantom(PhantomData),
-        }
-    }
-
-    fn id_bytes(title: &String, release_date: &i32) -> Vec<u8> {
-        let sanitized_title = SanitizedString::new(&title);
-
-        let mut bytes = T::TAG.as_bytes().to_vec();
-        bytes.extend(sanitized_title.as_bytes());
-        bytes.extend(release_date.to_le_bytes());
-        bytes
-    }
-
-    pub fn new_signed(title: String, release_date: i32, priv_key: &PrivateKey) -> Self {
-        let mut index = Self::new(
-            title,
-            release_date,
-            priv_key.public_key(),
-            Signature::empty(),
-        );
-
-        index.sign(priv_key);
-
-        index
-    }
-
-    pub fn strip_tag(self) -> Index<NoTag> {
-        // SAFETY: They're literally the same type, just different tags
-        unsafe { std::mem::transmute(self) }
-    }
-
-    fn sign(&mut self, priv_key: &PrivateKey) {
-        let to_sign = Self::id_bytes(&self.title, &self.release_date);
-        self.signature = priv_key.sign(&to_sign);
-    }
-
-    pub fn verify(&self) -> bool {
-        let to_verify = Self::id_bytes(&self.title, &self.release_date);
-        self.source.verify(&to_verify, &self.signature)
-    }
-
-    pub fn hash(&self) -> &Hash {
-        &self.hash
-    }
-
-    pub fn title(&self) -> &String {
-        &self.title
-    }
-
-    pub fn release_date(&self) -> i32 {
-        self.release_date
-    }
-
-    pub fn source(&self) -> &PublicKey {
-        &self.source
-    }
-
-    pub fn signature(&self) -> &Signature {
-        &self.signature
-    }
 }
-
-impl<T: IndexTag> Byteable for Index<T> {
-    async fn encode<W: AsyncWrite + Unpin + Send>(
-        &self,
-        writer: &mut W,
-    ) -> Result<(), EncodeError> {
-        self.hash.encode(writer).await?;
-        self.title.encode(writer).await?;
-        self.release_date.encode(writer).await?;
-        self.source.encode(writer).await?;
-        self.signature.encode(writer).await?;
-        Ok(())
-    }
-
-    async fn decode<R: AsyncRead + Unpin + Send>(reader: &mut R) -> Result<Self, DecodeError> {
-        Ok(Index {
-            hash: Hash::decode(reader).await?,
-            title: String::decode(reader).await?,
-            release_date: i32::decode(reader).await?,
-            source: PublicKey::decode(reader).await?,
-            signature: Signature::decode(reader).await?,
-            _phantom: SurrealPhantom(PhantomData),
-        })
-    }
-}
-
-// impl TaggedIndex {
-//     pub fn verify(&self) -> bool {
-//         match self {
-//             TaggedIndex::Novel(index) => index.verify(),
-//         }
-//     }
-// }
-
-// impl Byteable for TaggedIndex {
-//     async fn encode<W: AsyncWrite + Unpin + Send>(
-//         &self,
-//         writer: &mut W,
-//     ) -> Result<(), EncodeError> {
-//         match self {
-//             TaggedIndex::Novel(index) => {
-//                 MangaTag::TAG.to_string().encode(writer).await?;
-//                 index.encode(writer).await?;
-//             }
-//         }
-
-//         Ok(())
-//     }
-
-//     async fn decode<R: AsyncRead + Unpin + Send>(reader: &mut R) -> Result<Self, DecodeError> {
-//         let tag = String::decode(reader).await?;
-//         match tag.as_str() {
-//             MangaTag::TAG => Ok(TaggedIndex::Novel(Index::decode(reader).await?)),
-//             _ => Err(DecodeError::InvalidEnumVariant {
-//                 variant_value: tag,
-//                 enum_name: stringify!(TaggedIndex),
-//             }),
-//         }
-//     }
-// }
-
-// impl From<Index<MangaTag>> for TaggedIndex {
-//     fn from(index: Index<MangaTag>) -> Self {
-//         TaggedIndex::Novel(index)
-//     }
-// }
+#[cfg(feature = "surrealdb")]
+pub use surreal::*;

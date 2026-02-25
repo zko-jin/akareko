@@ -1,12 +1,11 @@
 use std::fmt::{Display, Formatter};
 
-use serde::{Deserialize, Deserializer, Serialize};
-use surrealdb::types::{RecordId, SurrealValue};
-use tokio::io::{AsyncRead, AsyncReadExt, AsyncWrite, AsyncWriteExt};
+use num_enum::TryFromPrimitive;
+use serde::{Deserialize, Serialize};
+use surrealdb::types::SurrealValue;
 
 use crate::{
     db::Timestamp,
-    errors::DatabaseError,
     hash::{PrivateKey, PublicKey, Signable, Signature},
 };
 
@@ -19,7 +18,7 @@ mod surreal;
 #[cfg(feature = "surrealdb")]
 pub use surreal::UserRepository;
 
-#[derive(Debug, Clone, Serialize, Deserialize, SurrealValue, Hash, PartialEq, Eq)]
+#[derive(Debug, Clone, TryFromPrimitive, Hash, PartialEq, Eq)]
 #[repr(u8)]
 pub enum TrustLevel {
     Ignore,     // Also used for your own user
@@ -27,6 +26,28 @@ pub enum TrustLevel {
     Untrusted,  // Default for users we have verified the address
     Trusted,
     FullTrust, // Set manually for sources
+}
+
+impl SurrealValue for TrustLevel {
+    fn kind_of() -> surrealdb_types::Kind {
+        surrealdb_types::Kind::Number
+    }
+
+    fn into_value(self) -> surrealdb_types::Value {
+        (self as u8).into_value()
+    }
+
+    fn from_value(value: surrealdb_types::Value) -> Result<Self, surrealdb::Error>
+    where
+        Self: Sized,
+    {
+        let value = u8::from_value(value)?;
+        value
+            .try_into()
+            .map_err(|e: num_enum::TryFromPrimitiveError<TrustLevel>| {
+                surrealdb::Error::internal(e.to_string())
+            })
+    }
 }
 
 impl TrustLevel {

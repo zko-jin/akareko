@@ -1,7 +1,7 @@
 use serde::{Deserialize, Serialize};
 use tokio::fs;
 use tracing::{error, warn};
-use yosemite::{I2pError, RouterApi};
+use yosemite::RouterApi;
 
 use crate::{
     db::user::I2PAddress,

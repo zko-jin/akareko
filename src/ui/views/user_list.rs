@@ -1,17 +1,13 @@
 use iced::{
     Subscription, Task,
-    widget::{Button, Column, button, column, row, text},
+    widget::{Column, row, text},
 };
 
 use crate::{
-    db::{
-        Index, Repositories,
-        index::{IndexRepository, MangaTag},
-        user::{User, UserRepository},
-    },
+    db::user::User,
     ui::{
         AppState, Message,
-        views::{View, ViewMessage, add_novel::AddNovelView, novel::NovelView},
+        views::{View, ViewMessage},
     },
 };
 

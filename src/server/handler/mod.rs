@@ -1,7 +1,7 @@
 use tokio::io::{AsyncRead, AsyncReadExt, AsyncWrite, AsyncWriteExt};
 
 use crate::{
-    db::{NoTag, user::I2PAddress},
+    db::user::I2PAddress,
     errors::{ClientError, DecodeError, EncodeError},
     helpers::Byteable,
     server::{
@@ -20,9 +20,6 @@ pub mod users;
 
 /// Marker implemented by the handler macro
 pub trait CommandEnum: Byteable {}
-
-/// Marker implemented by the handler macro
-pub trait CommandCategoryEnum: Byteable {}
 
 /// Should be implemented by each command, can be skipped by directly implementing [`AuroraProtocolCommandHandler`]
 pub(super) trait AuroraProtocolCommand: Sized + AuroraProtocolCommandMetadata {
@@ -73,10 +70,8 @@ impl<T: AuroraProtocolCommand> AuroraProtocolCommandHandler for T {
 
 /// Auto implemented by the handler macro, used to encode requests
 pub trait AuroraProtocolCommandMetadata {
-    type CommandCategory: CommandCategoryEnum;
     type CommandType: CommandEnum;
 
-    const COMMAND_CATEGORY: Self::CommandCategory;
     const COMMAND: Self::CommandType;
     const VERSION: AuroraProtocolVersion;
 
@@ -84,24 +79,23 @@ pub trait AuroraProtocolCommandMetadata {
         writer: &mut W,
     ) -> Result<(), EncodeError> {
         Self::VERSION.encode(writer).await?;
-        Self::COMMAND_CATEGORY.encode(writer).await?;
         Self::COMMAND.encode(writer).await
     }
 }
 
 pub trait AuroraMiddleware {}
 
-crate::handler!(V1, AuroraProtocolVersion::V1, {
-    Users(0) => {
-        GetUsers(0) => users::GetUsers,
-        Who(1) => users::Who
-    },
-    Index(1) => {
-        GetAllIndexes(0) => index::GetAllIndexes,
-        ExchangeContent(1) => index::ExchangeContent,
-        GetIndexes(2) => index::GetIndexes
-    },
-    Posts(2) => {
-        GetPostsByTopic(0) => post::GetPostsByTopic
-    }
+crate::handler!(V1,
+{
+    Who("who") => users::Who,
+
+    // ==================== User ====================
+    GetUsers("user/get_users") => users::GetUsers,
+
+    // ==================== Index ====================
+    GetAllIndexes("index/get_all_indexes") => index::GetAllIndexes,
+    GetIndexes("index/get_indexes") => index::GetIndexes,
+
+    // ==================== Post ====================
+    GetPostsByTopic("post/get_posts_by_topic") => post::GetPostsByTopic
 });

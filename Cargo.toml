@@ -17,10 +17,10 @@ serde_json = "1.0.141"
 
 toml = "0.9.2"
 url = "2.5.4"
-# diesel = { version = "2.2.12", features = ["sqlite", "r2d2"] }
-# diesel_migrations = "2.2.0"
-surrealdb = { version = "3.0.0", features = ["kv-surrealkv"] }
-surrealdb-core = "3.0.0"
+
+surrealdb = { version = "3.0.1", features = ["kv-surrealkv"] }
+surrealdb-types = "3.0.1"
+surrealdb-core = "3.0.1"
 
 async-trait = "0.1.89"
 ed25519-dalek = { version = "2.2.0", features = ["rand_core"] }
@@ -65,7 +65,7 @@ async_zip = { version = "0.0.18", features = ["tokio", "tokio-fs", "zstd", "lzma
 serde_bytes = "0.11.19"
 xorf = "0.12.0"
 fastbloom = "0.15.0"
-surrealdb-types = "3.0.0"
+num_enum = "0.7.5"
 
 
 [features]

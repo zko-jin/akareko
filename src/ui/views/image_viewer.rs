@@ -1,4 +1,4 @@
-use std::{io::Read, path::PathBuf};
+use std::path::PathBuf;
 
 use async_zip::base::read::seek::ZipFileReader;
 use futures::{AsyncReadExt, SinkExt};
@@ -6,15 +6,14 @@ use iced::{
     Element, Event, Length, Subscription, Task, event,
     keyboard::{self, Key, key::Named},
     stream,
-    task::sipper,
     widget::{
-        self, Column, Image, Scrollable, Space, button, center, column, container,
+        self, Scrollable, Space, button, center, column, container,
         image::Handle,
         mouse_area,
         operation::{scroll_by, snap_to},
         row,
         scrollable::{self},
-        stack, text, text_input,
+        stack, text,
     },
 };
 use tokio::{
@@ -23,13 +22,10 @@ use tokio::{
 };
 use tracing::error;
 
-use crate::{
-    db::{Index, Repositories, index::IndexRepository},
-    ui::{
-        AppState, Message,
-        components::toast::Toast,
-        views::{View, ViewMessage, novel_list::NovelListView},
-    },
+use crate::ui::{
+    AppState, Message,
+    components::toast::Toast,
+    views::{View, ViewMessage},
 };
 
 const SCROLLABLE: &str = "image_scrollable";
@@ -260,11 +256,11 @@ impl ImageViewerView {
         ])
     }
 
-    pub fn on_enter(state: &mut AppState) -> Task<Message> {
+    pub fn on_enter(_: &mut AppState) -> Task<Message> {
         Task::none()
     }
 
-    pub fn view(&self, state: &AppState) -> iced::Element<'_, Message> {
+    pub fn view(&self, _: &AppState) -> iced::Element<'_, Message> {
         let clickable_area = container(row![
             mouse_area(
                 Space::new()

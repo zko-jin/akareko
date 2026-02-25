@@ -1,14 +1,11 @@
 use iced::{
     Subscription, Task,
-    widget::{Button, Column, button, column, row, text},
+    widget::{Column, button, text},
 };
 use tracing::error;
 
 use crate::{
-    db::{
-        Index, Repositories,
-        index::{IndexRepository, MangaTag},
-    },
+    db::index::{Index, tags::MangaTag},
     ui::{
         AppState, Message,
         components::toast::Toast,
@@ -17,7 +14,7 @@ use crate::{
 };
 
 #[derive(Debug, Clone)]
-pub struct NovelListView {
+pub struct MangaListView {
     novels: Vec<Index<MangaTag>>,
 }
 
@@ -32,7 +29,7 @@ impl From<NovelListMessage> for Message {
     }
 }
 
-impl NovelListView {
+impl MangaListView {
     pub fn new() -> Self {
         Self { novels: vec![] }
     }
@@ -46,7 +43,7 @@ impl NovelListView {
             let repositories = repositories.clone();
 
             return Task::future(async move {
-                let novels = match repositories.index().await.get_all_indexes().await {
+                let novels = match repositories.index().await.get_all_indexes(0, None).await {
                     Ok(novels) => novels,
                     Err(e) => {
                         error!("Failed to get all indexes: {}", e);

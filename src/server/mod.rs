@@ -7,12 +7,9 @@ use yosemite::{Session, SessionOptions, style};
 
 use crate::{
     config::AuroraConfig,
-    db::{
-        Repositories,
-        user::{I2PAddress, UserRepository},
-    },
-    errors::{DecodeError, IoError, ServerError},
-    helpers::{Byteable, b32_from_pub_b64},
+    db::{Repositories, user::I2PAddress},
+    errors::{DecodeError, ServerError},
+    helpers::Byteable,
     server::protocol::AuroraProtocolVersion,
 };
 
@@ -22,21 +19,6 @@ pub mod protocol;
 pub mod proxy;
 
 pub struct AuroraServer {}
-
-// #[cfg(target_os = "windows")]
-// fn get_i2p_config_folder() -> PathBuf {
-//     dirs::config_dir().unwrap().join("i2pd")
-// }
-
-// #[cfg(target_os = "linux")]
-// fn get_i2p_config_folder() -> PathBuf {
-//     dirs::config_dir().unwrap().join("i2pd")
-// }
-
-// #[cfg(target_os = "android")]
-// fn get_i2p_config_folder() -> PathBuf {
-//     dirs::config_dir().unwrap().join("i2pd")
-// }
 
 #[derive(Clone)]
 struct ServerState {
@@ -85,8 +67,6 @@ impl AuroraServer {
             let state = state.clone();
             tokio::spawn(async move {
                 let address = I2PAddress::new(stream.remote_destination());
-
-                // state.repositories.user().get_user(address);
 
                 loop {
                     let version = match AuroraProtocolVersion::decode(&mut stream).await {

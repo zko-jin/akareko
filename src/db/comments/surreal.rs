@@ -1,11 +1,10 @@
-use std::collections::{HashSet, LinkedList};
+use std::collections::HashSet;
 
 use const_format::formatcp;
 use fastbloom::BloomFilter;
-use serde::{Deserialize, Serialize, de::DeserializeOwned};
-use surrealdb::{Notification, Surreal, engine::local::Db, types::SurrealValue};
+use surrealdb::{Surreal, engine::local::Db};
+use surrealdb_types::SurrealValue;
 use tracing::info;
-use xorf::{BinaryFuse16, BinaryFuse32, Filter};
 
 use crate::{
     db::{
@@ -14,7 +13,6 @@ use crate::{
         user::User,
     },
     errors::DatabaseError,
-    hash::{Hash, PublicKey, Signature},
 };
 
 pub struct PostRepository<'a> {
@@ -80,47 +78,95 @@ impl<'a> PostRepository<'a> {
             ",
             Post::TABLE_NAME
         );
-        todo!()
 
-        // #[derive(SurrealValue)]
-        // struct Response {
-        //     total: usize,
-        //     data: Vec<Post>,
-        //     users: HashSet<User>,
-        // }
+        #[derive(SurrealValue)]
+        struct Response {
+            total: usize,
+            data: Vec<Post>,
+            // TODO: Change this to HashSet when surrealdb-types supports it
+            users: Vec<User>,
+        }
 
-        // let result: Option<Response> = self
-        //     .db
-        //     .query(QUERY)
-        //     .bind(("topic", topic))
-        //     .bind(("take", take))
-        //     .bind(("skip", skip))
-        //     .await?
-        //     .take(3)?;
+        let result: Option<Response> = self
+            .db
+            .query(QUERY)
+            .bind(("topic", topic))
+            .bind(("take", take))
+            .bind(("skip", skip))
+            .await?
+            .take(3)?;
 
-        // match result {
-        //     Some(r) => Ok(PaginateResponse {
-        //         values: (r.data, r.users),
-        //         total: r.total,
-        //     }),
-        //     None => Err(DatabaseError::Unknown),
-        // }
+        match result {
+            Some(r) => Ok(PaginateResponse {
+                values: (r.data, HashSet::from_iter(r.users)),
+                total: r.total,
+            }),
+            None => Err(DatabaseError::Unknown),
+        }
+    }
+
+    pub async fn make_filter(
+        &self,
+        topic: Topic,
+        timestamp: u64,
+    ) -> Result<BloomFilter, DatabaseError> {
+        let query: String = format!(
+            "
+                SELECT * FROM {0} WHERE topic = $topic {1};
+            ",
+            Post::TABLE_NAME,
+            if timestamp != 0 {
+                " AND timestamp >= $timestamp"
+            } else {
+                ""
+            }
+        );
+
+        let result: Vec<Post> = self
+            .db
+            .query(query)
+            .bind(("topic", topic))
+            .bind(("timestamp", timestamp))
+            .await?
+            .take(0)?;
+
+        let mut filter = BloomFilter::with_false_pos(0.0001).expected_items(result.len());
+        filter.insert(&result);
+
+        Ok(filter)
     }
 
     pub async fn get_all_posts_by_topic(
         &self,
         topic: Topic,
-        filter: &BloomFilter,
+        timestamp: u64,
+        filter: Option<BloomFilter>,
     ) -> Result<Vec<Post>, DatabaseError> {
-        const QUERY: &'static str = formatcp!(
+        let query: String = format!(
             "
-                SELECT * FROM {0} WHERE topic = $topic;
+                SELECT * FROM {0} WHERE topic = $topic {1};
             ",
-            Post::TABLE_NAME
+            Post::TABLE_NAME,
+            if timestamp != 0 {
+                " AND timestamp >= $timestamp"
+            } else {
+                ""
+            }
         );
 
-        let result: Vec<Post> = self.db.query(QUERY).bind(("topic", topic)).await?.take(0)?;
+        let result: Vec<Post> = self
+            .db
+            .query(query)
+            .bind(("topic", topic))
+            .bind(("timestamp", timestamp))
+            .await?
+            .take(0)?;
 
-        Ok(result)
+        let filtered_posts = match filter {
+            Some(filter) => result.into_iter().filter(|p| !filter.contains(p)).collect(),
+            None => result,
+        };
+
+        Ok(filtered_posts)
     }
 }

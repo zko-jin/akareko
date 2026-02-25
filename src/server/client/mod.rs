@@ -1,33 +1,23 @@
-use std::{
-    collections::{HashMap, HashSet},
-    ops::DerefMut,
-};
-
 use rclite::Arc;
-use tokio::{
-    io::AsyncWriteExt,
-    sync::{Mutex, MutexGuard},
-};
+use tokio::sync::Mutex;
 use tracing::{error, info};
 use yosemite::{Session, SessionOptions, Stream, style};
 
 use crate::{
     config::AuroraConfig,
     db::{
-        Content, Index, IndexTag, Repositories,
-        index::{IndexRepository, MangaTag, TaggedContent},
-        user::{I2PAddress, TrustLevel, User, UserRepository},
+        Repositories,
+        index::{Index, IndexRepository, tags::IndexTag},
+        user::{I2PAddress, TrustLevel, User},
     },
     errors::ClientError,
-    hash::{Hash, PublicKey, Signable},
-    helpers::Byteable,
+    hash::PublicKey,
     server::{
         handler::{
-            self, AuroraProtocolCommand, AuroraProtocolCommandMetadata,
-            index::{ExchangeContentRequest, GetAllIndexesRequest, GetIndexesRequest},
+            self, AuroraProtocolCommand,
+            index::GetAllIndexesRequest,
             users::{get_users::GetUsersRequest, who::WhoRequest},
         },
-        protocol::AuroraProtocolResponse,
         proxy::LoggingStream, // proxy::I2PConnector,
     },
 };
@@ -85,9 +75,11 @@ impl AuroraClient {
     ) -> Result<(), ClientError> {
         let mut stream = self.get_stream(url).await?;
 
-        let mut res =
-            handler::index::GetAllIndexes::request(GetAllIndexesRequest::new::<T>(), &mut stream)
-                .await?;
+        let mut res = handler::index::GetAllIndexes::request(
+            GetAllIndexesRequest::new::<T>(0, None),
+            &mut stream,
+        )
+        .await?;
 
         if !res.status().is_ok() {
             return Err(ClientError::UnexpectedResponseCode {
@@ -96,14 +88,14 @@ impl AuroraClient {
         }
 
         while let Ok(Some(index)) = res.data().next(&mut stream).await {
-            let index: Index<T> = index.make_tagged();
+            let index: Index<T> = index.transmute();
 
             if !index.verify() {
                 error!("Invalid index signature");
                 continue;
             }
 
-            match db.add_index(index).await {
+            match db.add_index::<T>(index).await {
                 Ok(_) => {}
                 Err(e) => {
                     error!("Failed to add index: {}", e);

@@ -2,14 +2,9 @@
 macro_rules! handler {
     (
         $version:ident,
-        $protocol_version:path,
         {
             $(
-                $category:ident ($cat_discriminant:expr) => {
-                    $(
-                        $command:ident ($cmd_discriminant:expr) => $handler:path
-                    ),* $(,)?
-                }
+                $command:ident ($cmd_discriminant:literal) => $handler:path
             ),* $(,)?
         }
     ) => {
@@ -17,62 +12,60 @@ macro_rules! handler {
             pub struct $version;
 
             #[repr(u8)]
-            #[derive(Debug, Clone, byteable_derive::Byteable)]
-            pub enum [<AuroraProtocolCommandCategory $version>] {
+            #[derive(Debug, Clone)]
+            pub enum [<Commands $version>] {
                 $(
-                    $category = $cat_discriminant,
+                    $command,
                 )*
             }
-
-            impl CommandCategoryEnum for [<AuroraProtocolCommandCategory $version>] {}
-
-            $(
-                #[repr(u8)]
-                #[derive(Debug, Clone, byteable_derive::Byteable)]
-                pub enum [<$category Command $version>] {
-                    $(
-                        $command = $cmd_discriminant,
-                    )*
+            impl CommandEnum for [<Commands $version>] {}
+            impl Byteable for CommandsV1 {
+                async fn encode<W: AsyncWrite + Unpin + Send>(
+                    &self,
+                    writer: &mut W,
+                ) -> Result<(), EncodeError> {
+                    match self {
+                        $(
+                            [<Commands $version>]::$command => $cmd_discriminant.to_string().encode(writer).await,
+                        )*
+                    }
                 }
 
-                impl CommandEnum for [<$category Command $version>] {}
+                async fn decode<R: AsyncRead + Unpin + Send>(reader: &mut R) -> Result<Self, DecodeError> {
+                    Ok(match String::decode(reader).await?.as_str() {
+                        $(
+                            $cmd_discriminant => [<Commands $version>]::$command,
+                        )*
+                        s => return Err(DecodeError::InvalidEnumVariant {
+                            variant_value: s.to_string(),
+                            enum_name: stringify!([<Commands $version>]),
+                        }),
+                    })
+                }
+            }
 
-                $(
-                    impl AuroraProtocolCommandMetadata for $handler {
-                        type CommandCategory = [<AuroraProtocolCommandCategory $version>];
-                        type CommandType = [<$category Command $version>];
+            $(
+                impl AuroraProtocolCommandMetadata for $handler {
+                    type CommandType = [<Commands $version>];
 
-                        const COMMAND_CATEGORY: [<AuroraProtocolCommandCategory $version>] =
-                            [<AuroraProtocolCommandCategory $version>]::$category;
-                        const COMMAND: [<$category Command $version>] =
-                            [<$category Command $version>]::$command;
-                        const VERSION: AuroraProtocolVersion = $protocol_version;
-                    }
-                )*
+                    const COMMAND: [<Commands $version>] =
+                        [<Commands $version>]::$command;
+                    const VERSION: AuroraProtocolVersion = AuroraProtocolVersion::$version;
+                }
             )*
 
             impl $version {
                 pub async fn handle<S: AsyncRead + AsyncWrite + Unpin + Send>(stream: &mut S, state: &ServerState, address: &I2PAddress) {
-                    let command = [<AuroraProtocolCommandCategory $version>]::decode(stream)
+                    let command = [<Commands $version>]::decode(stream)
                         .await
                         .unwrap();
 
                     match command {
                         $(
-                            [<AuroraProtocolCommandCategory $version>]::$category => {
-                                let command = [<$category Command $version>]::decode(stream)
-                                    .await
-                                    .unwrap();
-
-                                match command {
-                                    $(
-                                        [<$category Command $version>]::$command => {
-                                            <$handler as AuroraProtocolCommandHandler>::handle(stream, state, address).await;
-                                        }
-                                    )*
-                                }
+                            [<Commands $version>]::$command => {
+                                <$handler as AuroraProtocolCommandHandler>::handle(stream, state, address).await;
                             }
-                        ),*
+                        )*
                     }
                 }
             }

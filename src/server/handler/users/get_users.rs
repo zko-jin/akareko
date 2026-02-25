@@ -18,7 +18,7 @@ impl AuroraProtocolCommand for GetUsers {
     async fn process(
         req: Self::RequestPayload,
         state: &ServerState,
-        address: &I2PAddress,
+        _: &I2PAddress,
     ) -> AuroraProtocolResponse<Self::ResponsePayload, Self::ResponseData> {
         let users = match state
             .repositories

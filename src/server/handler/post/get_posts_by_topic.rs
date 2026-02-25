@@ -1,12 +1,10 @@
+use fastbloom::BloomFilter;
+
 use crate::{
     db::{
-        IndexTag, Repositories,
         comments::{Post, Topic},
-        index::{IndexRepository, MangaTag},
         user::I2PAddress,
     },
-    hash::Hash,
-    helpers::Byteable,
     server::{ServerState, handler::AuroraProtocolCommand, protocol::AuroraProtocolResponse},
 };
 
@@ -15,47 +13,33 @@ pub struct GetPostsByTopic;
 impl AuroraProtocolCommand for GetPostsByTopic {
     type RequestPayload = GetPostsByTopicRequest;
     type ResponsePayload = GetPostsByTopicResponse;
-    type ResponseData = ();
+    type ResponseData = Post;
 
     async fn process(
         req: Self::RequestPayload,
         state: &ServerState,
-        address: &I2PAddress,
+        _address: &I2PAddress,
     ) -> AuroraProtocolResponse<Self::ResponsePayload, Self::ResponseData> {
-        todo!();
-        let posts = state
+        let Ok(posts) = state
             .repositories
             .posts()
             .await
-            .get_posts_by_topic(req.topic, 2000, 0)
+            .get_all_posts_by_topic(req.topic, req.timestamp, req.filter)
             .await
-            .unwrap()
-            .values
-            .0;
+        else {
+            return AuroraProtocolResponse::internal_error("Database error".to_string());
+        };
 
-        AuroraProtocolResponse::ok(GetPostsByTopicResponse { posts })
-    }
-
-    async fn request<S: tokio::io::AsyncRead + tokio::io::AsyncWrite + Unpin + Send>(
-        payload: Self::RequestPayload,
-        stream: &mut S,
-    ) -> Result<
-        AuroraProtocolResponse<Self::ResponsePayload, Self::ResponseData>,
-        crate::errors::ClientError,
-    > {
-        let req = crate::server::protocol::AuroraProtocolRequest::<Self> { payload };
-        req.encode(stream).await?;
-        let res = AuroraProtocolResponse::decode(stream).await?;
-        Ok(res)
+        AuroraProtocolResponse::ok_with_data(GetPostsByTopicResponse {}, posts)
     }
 }
 
 #[derive(byteable_derive::Byteable)]
 pub struct GetPostsByTopicRequest {
     pub topic: Topic,
+    pub timestamp: u64,
+    pub filter: Option<BloomFilter>,
 }
 
 #[derive(byteable_derive::Byteable)]
-pub struct GetPostsByTopicResponse {
-    pub posts: Vec<Post>,
-}
+pub struct GetPostsByTopicResponse {}

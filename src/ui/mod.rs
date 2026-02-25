@@ -7,7 +7,7 @@ use iced::{
 use rclite::Arc;
 use std::path::PathBuf;
 use tokio::sync::{RwLock, mpsc};
-use tracing::{error, info};
+use tracing::error;
 
 use crate::{
     config::AuroraConfig,
@@ -134,7 +134,7 @@ impl AppState {
         self.theme.clone()
     }
 
-    pub fn view(&self, id: window::Id) -> iced::Element<'_, Message> {
+    pub fn view(&self, _id: window::Id) -> iced::Element<'_, Message> {
         if !self.has_initialized() {
             return column![text("Loading...")].into();
         }
@@ -241,7 +241,7 @@ impl AppState {
                     let client = torrent_client.clone();
 
                     return Task::future(async move {
-                        let info_hash = client.add_magnet(&magnet, &path).await;
+                        let _ = client.add_magnet(&magnet, &path).await;
                         Message::Nothing
                     });
                 }

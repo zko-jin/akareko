@@ -4,9 +4,8 @@ use base64::prelude::BASE64_URL_SAFE_NO_PAD;
 use base64::{Engine as _, engine::general_purpose::STANDARD_NO_PAD};
 use ed25519_dalek::{SigningKey, ed25519::signature::SignerMut};
 use rand::rngs::OsRng;
-use serde::de::Error as DeError;
-use serde::{Deserialize, Deserializer, Serialize, Serializer};
-use surrealdb::types::{Bytes, SerializationError, SurrealValue};
+use serde::{Deserialize, Serialize};
+use surrealdb::types::{SerializationError, SurrealValue};
 use zeroize::ZeroizeOnDrop;
 
 use crate::errors::Base64Error;

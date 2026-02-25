@@ -6,7 +6,7 @@ use iced::{
 use tokio::sync::mpsc;
 use tracing::error;
 
-use crate::{db::Repositories, ui::Message};
+use crate::ui::Message;
 
 #[derive(Debug, Clone)]
 pub struct Toast {
@@ -32,7 +32,7 @@ pub enum ToastType {
 }
 
 impl Toast {
-    pub fn view(&self, index: usize) -> Element<Message> {
+    pub fn view(&self, index: usize) -> Element<'_, Message> {
         column![
             button(text("X")).on_press(Message::CloseToast(index)),
             text(&self.title),

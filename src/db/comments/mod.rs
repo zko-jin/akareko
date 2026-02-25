@@ -1,11 +1,15 @@
-use serde::de::Error as DeError;
-use serde::{Deserialize, Deserializer, Serialize};
-use surrealdb::types::{Object, RecordId, SerializationError, SurrealValue};
+use serde::{Deserialize, Serialize};
+use surrealdb::types::{SerializationError, SurrealValue};
 
 use crate::{
-    db::{Index, IndexTag, Timestamp, user::User},
+    db::{
+        Timestamp,
+        index::{Index, tags::IndexTag},
+    },
     hash::{Hash, PublicKey, Signature},
 };
+
+// ==================== End Imports ====================
 
 #[cfg(feature = "surrealdb")]
 mod surreal;
