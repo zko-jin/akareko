@@ -7,6 +7,7 @@ use crate::{
         index::{Index, tags::IndexTag},
     },
     errors::DatabaseError,
+    hash::Hash,
 };
 
 pub struct IndexFollowRepository<'a> {
@@ -37,6 +38,27 @@ impl<'a> IndexFollowRepository<'a> {
             }
             None => Err(DatabaseError::Unknown),
         }
+    }
+
+    pub async fn get_index_follow<T: IndexTag>(
+        &self,
+        index: Hash,
+    ) -> Result<Option<IndexFollow<T>>, DatabaseError> {
+        let result: Option<IndexFollow<T>> = self
+            .db
+            .select((IndexFollow::<T>::table_name(), index.as_base64()))
+            .await?;
+
+        Ok(result)
+    }
+
+    pub async fn remove_index_follow<T: IndexTag>(&self, index: Hash) -> Result<(), DatabaseError> {
+        let _: Option<surrealdb_types::Value> = self
+            .db
+            .delete((IndexFollow::<T>::table_name(), index.as_base64()))
+            .await?;
+
+        Ok(())
     }
 
     pub async fn get_followed_indexes<T: IndexTag>(

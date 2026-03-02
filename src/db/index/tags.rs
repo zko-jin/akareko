@@ -2,7 +2,7 @@ use std::fmt::Debug;
 use surrealdb_types::SurrealValue;
 
 use crate::{
-    db::ToBytes,
+    db::{ToBytes, event::EventType},
     helpers::{Byteable, Language},
 };
 
@@ -11,7 +11,10 @@ use crate::{
 pub trait IndexTag: Send + Clone + Debug {
     const TAG: &'static str; // Acts like table name
     const CONTENT_TABLE: &'static str;
-    type Content: Send + Clone + Debug + ToBytes + Byteable + SurrealValue;
+    type ExtraMetadata: Send + Clone + Debug + ToBytes + Byteable + SurrealValue;
+
+    const EVENT_TYPE: EventType;
+    const CONTENT_EVENT_TYPE: EventType;
 }
 
 // ==============================================================================
@@ -23,7 +26,10 @@ pub struct MangaTag;
 impl IndexTag for MangaTag {
     const TAG: &'static str = "mangas";
     const CONTENT_TABLE: &'static str = "manga_chapters";
-    type Content = MangaChapter;
+    type ExtraMetadata = MangaChapter;
+
+    const EVENT_TYPE: EventType = EventType::Manga;
+    const CONTENT_EVENT_TYPE: EventType = EventType::MangaContent;
 }
 
 // ==================== Manga Chapter ====================
@@ -56,5 +62,8 @@ impl IndexTag for NoTag {
 
     const CONTENT_TABLE: &'static str = "";
 
-    type Content = ();
+    type ExtraMetadata = ();
+
+    const EVENT_TYPE: EventType = EventType::Invalid;
+    const CONTENT_EVENT_TYPE: EventType = EventType::Invalid;
 }

@@ -1,131 +1,161 @@
-use deadpool_sqlite::Connection;
+use diesel::{
+    associations::HasTable,
+    deserialize::{FromSql, FromSqlRow},
+    insert_into, no_arg_sql_function,
+    prelude::*,
+    upsert::excluded,
+};
+use diesel_async::{
+    RunQueryDsl,
+    pooled_connection::{AsyncDieselConnectionManager, bb8::PooledConnection},
+};
 use rand::seq::{IteratorRandom, SliceRandom};
-use surrealdb::{RecordId, Surreal, engine::local::Db};
 use tracing::info;
 
-use crate::{errors::DatabaseError, hash::PublicKey};
+use crate::{
+    db::{Connection, DbPool, user::TrustLevel},
+    errors::DatabaseError,
+    hash::PublicKey,
+};
 
 use super::User;
 
-pub struct UserRepository(Connection);
+pub struct UserRepository(DbPool);
 
 impl UserRepository {
-    pub fn new(conn: Connection) -> UserRepository {
-        UserRepository(conn)
+    pub fn new(pool: DbPool) -> UserRepository {
+        UserRepository(pool)
     }
 }
 
+#[cfg(feature = "sqlite")]
+pub mod sqlite {
+    use diesel::{
+        deserialize::FromSql,
+        serialize::{self, IsNull, Output, ToSql},
+        sql_types::{Binary, Integer, Text},
+        sqlite::{Sqlite, SqliteValue},
+    };
+
+    use crate::{
+        db::user::{I2PAddress, TrustLevel},
+        hash::{PublicKey, Signature},
+    };
+
+    impl FromSql<Integer, Sqlite> for TrustLevel {
+        fn from_sql(bytes: SqliteValue) -> diesel::deserialize::Result<Self> {
+            let value = <i32 as FromSql<Integer, Sqlite>>::from_sql(bytes)?;
+            match value.try_into() {
+                Ok(trust_level) => Ok(trust_level),
+                Err(e) => Err(format!("Invalid TrustLevel value: {}", e).into()),
+            }
+        }
+    }
+
+    impl ToSql<Integer, Sqlite> for TrustLevel {
+        fn to_sql<'b>(&'b self, out: &mut Output<'b, '_, Sqlite>) -> serialize::Result {
+            out.set_value(*self as i32);
+            Ok(IsNull::No)
+        }
+    }
+
+    impl FromSql<Text, Sqlite> for I2PAddress {
+        fn from_sql(bytes: SqliteValue) -> diesel::deserialize::Result<Self> {
+            let value = <String as FromSql<Text, Sqlite>>::from_sql(bytes)?;
+            Ok(I2PAddress::new(value))
+        }
+    }
+
+    impl ToSql<Text, Sqlite> for I2PAddress {
+        fn to_sql<'b>(&'b self, out: &mut Output<'b, '_, Sqlite>) -> serialize::Result {
+            out.set_value(self.inner().as_str());
+            Ok(IsNull::No)
+        }
+    }
+}
+
+#[declare_sql_function]
+extern "SQL" {
+    fn random() -> Text;
+}
+
 impl UserRepository {
-    pub async fn upsert_user(&self, users: User) -> Result<User, DatabaseError> {
-        todo!()
-        // // if user.verify() {
-        // //     return Err(DatabaseError::InvalidSignature);
-        // // }
+    pub async fn upsert_user(&self, user: User) -> Result<(), DatabaseError> {
+        use crate::db::schema::users;
 
-        // let result: Option<User> = self
-        //     .db
-        //     .upsert(("users", users.pub_key().to_base64()))
-        //     .content(users)
-        //     .await?;
+        let mut conn = self.0.get().await.unwrap();
 
-        // match result {
-        //     Some(user) => {
-        //         info!("Created user: {}", user.name());
-        //         Ok(user)
-        //     }
-        //     None => Err(DatabaseError::Unknown),
-        // }
-    }
+        diesel::insert_into(users::table)
+            .values(&user)
+            .on_conflict(users::pub_key)
+            .filter_target(excluded(users::timestamp.gt(users::timestamp)))
+            .do_update()
+            .set((
+                users::name.eq(excluded(users::name)),
+                users::timestamp.eq(excluded(users::timestamp)),
+                users::signature.eq(excluded(users::signature)),
+                users::address.eq(excluded(users::address)),
+                users::trust.eq(excluded(users::trust)),
+            ))
+            .execute(&mut conn)
+            .await;
 
-    pub async fn update_user(&self, user: User) -> Result<User, DatabaseError> {
-        todo!()
-        // let result: Option<User> = self
-        //     .db
-        //     .update(("users", user.pub_key().to_base64()))
-        //     .content(user)
-        //     .await?;
-
-        // match result {
-        //     Some(user) => {
-        //         info!("Updated user: {}", user.name());
-        //         Ok(user)
-        //     }
-        //     None => Err(DatabaseError::Unknown),
-        // }
-    }
-
-    pub async fn get_users_b64(
-        &self,
-        pub_keys_base64: Vec<String>,
-    ) -> Result<Vec<User>, DatabaseError> {
-        todo!()
-        // let ids: Vec<RecordId> = pub_keys_base64
-        //     .iter()
-        //     .map(|p| RecordId::from(("users", p)))
-        //     .collect();
-
-        // let results: Vec<User> = self
-        //     .db
-        //     .query("SELECT * FROM $ids")
-        //     .bind(("ids", ids))
-        //     .await?
-        //     .take(0)?;
-
-        // Ok(results)
+        Ok(())
     }
 
     pub async fn get_users(&self, pub_keys: Vec<PublicKey>) -> Result<Vec<User>, DatabaseError> {
-        todo!()
-        // let ids: Vec<RecordId> = pub_keys
-        //     .iter()
-        //     .map(|p| RecordId::from(("users", p.to_base64())))
-        //     .collect();
+        use crate::db::schema::users::dsl::*;
 
-        // let results: Vec<User> = self
-        //     .db
-        //     .query("SELECT * FROM $ids")
-        //     .bind(("ids", ids))
-        //     .await?
-        //     .take(0)?;
+        let mut conn = self.0.get().await.unwrap();
 
-        // Ok(results)
+        let results: Vec<User> = users
+            .filter(pub_key.eq_any(pub_keys))
+            .select(User::as_select())
+            .load(&mut conn)
+            .await?;
+
+        Ok(results)
     }
 
-    pub async fn get_random_user(&self) -> Result<User, DatabaseError> {
-        // let results: Vec<User> = self.db.select("users").await.unwrap();
-        // let user = results.into_iter().choose(&mut rand::thread_rng());
-        // match user {
-        //     Some(user) => Ok(user),
-        //     None => Err(DatabaseError::Unknown),
-        // }
-        todo!()
+    pub async fn get_random_users(
+        &self,
+        min_trust: TrustLevel,
+        take: u32,
+    ) -> Result<Vec<User>, DatabaseError> {
+        use crate::db::schema::users::dsl::*;
+
+        let mut conn = self.0.get().await.unwrap();
+
+        let results: Vec<User> = users
+            .filter(trust.ge(min_trust as i32))
+            .order(random())
+            .limit(take as i64) // This is a bit weird, for some reason diesel takes an i64
+            .load(&mut conn)
+            .await?;
+
+        Ok(results)
     }
 
-    pub async fn get_all_users(&self) -> Vec<User> {
-        // let results: Vec<User> = self.db.select("users").await.unwrap();
-        // results
-        let results: i64 = self
-            .0
-            .interact(|conn| async move {
-                // let mut stmt = conn.prepare("SELECT * FROM users").unwrap();
-                // let mut rows = stmt.query([]).unwrap();
-                // let row = rows.next().unwrap().unwrap();
-                0i64
-            })
-            .await
-            .unwrap()
-            .await;
-        todo!()
+    pub async fn get_all_users(&mut self) -> Result<Vec<User>, DatabaseError> {
+        use crate::db::schema::users::dsl::*;
+        let mut conn = self.0.get().await.unwrap();
+        let result: Vec<User> = users.select(User::as_select()).load(&mut conn).await?;
+
+        Ok(result)
     }
 
-    pub async fn get_user(&self, pub_key: &PublicKey) -> Option<User> {
-        // let results: Option<User> = self
-        //     .db
-        //     .select(("users", pub_key.to_base64()))
-        //     .await
-        //     .unwrap();
+    pub async fn get_user(&self, key: &PublicKey) -> Result<Option<User>, DatabaseError> {
+        use crate::db::schema::users::dsl::*;
+        let mut conn = self.0.get().await.unwrap();
+        let result: Vec<User> = users
+            .filter(pub_key.eq(key))
+            .select(User::as_select())
+            .load(&mut conn)
+            .await?;
 
-        // results
-        todo!()
+        match result.into_iter().next() {
+            Some(user) => Ok(Some(user)),
+            None => Ok(None),
+        }
     }
 }

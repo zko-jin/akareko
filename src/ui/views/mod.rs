@@ -1,5 +1,6 @@
 pub mod add_chapter;
 pub mod add_novel;
+pub mod database_viewer;
 pub mod home;
 pub mod image_viewer;
 pub mod novel;
@@ -15,10 +16,11 @@ use crate::ui::{
     views::{
         add_chapter::{AddMangaChapterMessage, AddMangaChapterView},
         add_novel::{AddNovelMessage, AddNovelView},
+        database_viewer::{DatabaseViewerMessage, DatabaseViewerView},
         home::{HomeMessage, HomeView},
         image_viewer::{ImageViewerMessage, ImageViewerView},
-        novel::{NovelMessage, NovelView},
-        novel_list::{MangaListView, NovelListMessage},
+        novel::{MangaMessage, MangaView},
+        novel_list::{MangaListMessage, MangaListView},
         post::{PostMessage, PostView},
         settings::{SettingsMessage, SettingsView},
         user_list::{UserListMessage, UserListView},
@@ -29,26 +31,28 @@ use crate::ui::{
 pub enum View {
     Home(HomeView),
     NovelList(MangaListView),
-    Novel(NovelView),
+    Novel(MangaView),
     AddNovel(AddNovelView),
     AddChapter(AddMangaChapterView),
     Settings(SettingsView),
     ImageViewer(ImageViewerView),
     UserList(UserListView),
     Post(PostView),
+    DatabaseViewer(DatabaseViewerView),
 }
 
 #[derive(Debug, Clone)]
 pub enum ViewMessage {
     Home(HomeMessage),
-    NovelList(NovelListMessage),
-    Novel(NovelMessage),
+    NovelList(MangaListMessage),
+    Novel(MangaMessage),
     AddNovel(AddNovelMessage),
     AddChapter(AddMangaChapterMessage),
     Settings(SettingsMessage),
     ImageViewer(ImageViewerMessage),
     UserList(UserListMessage),
     Post(PostMessage),
+    DatabaseViewer(DatabaseViewerMessage),
 }
 
 impl View {
@@ -56,13 +60,14 @@ impl View {
         match state.view {
             View::Home(_) => HomeView::on_enter(state),
             View::NovelList(_) => MangaListView::on_enter(state),
-            View::Novel(_) => NovelView::on_enter(state),
+            View::Novel(_) => MangaView::on_enter(state),
             View::AddNovel(_) => AddNovelView::on_enter(state),
             View::AddChapter(_) => AddMangaChapterView::on_enter(state),
             View::Settings(_) => SettingsView::on_enter(state),
             View::ImageViewer(_) => ImageViewerView::on_enter(state),
             View::UserList(_) => UserListView::on_enter(state),
             View::Post(_) => PostView::on_enter(state),
+            View::DatabaseViewer(_) => DatabaseViewerView::on_enter(state),
         }
     }
 
@@ -77,6 +82,7 @@ impl View {
             View::ImageViewer(v) => v.view(state),
             View::UserList(v) => v.view(state),
             View::Post(v) => v.view(state),
+            View::DatabaseViewer(v) => v.view(state),
         }
     }
 
@@ -84,13 +90,14 @@ impl View {
         match message {
             ViewMessage::Home(m) => HomeView::update(m, state),
             ViewMessage::NovelList(m) => MangaListView::update(m, state),
-            ViewMessage::Novel(m) => NovelView::update(m, state),
+            ViewMessage::Novel(m) => MangaView::update(m, state),
             ViewMessage::AddNovel(m) => AddNovelView::update(m, state),
             ViewMessage::AddChapter(m) => AddMangaChapterView::update(m, state),
             ViewMessage::Settings(m) => SettingsView::update(m, state),
             ViewMessage::ImageViewer(m) => ImageViewerView::update(m, state),
             ViewMessage::UserList(m) => UserListView::update(m, state),
             ViewMessage::Post(m) => PostView::update(m, state),
+            ViewMessage::DatabaseViewer(m) => DatabaseViewerView::update(m, state),
         }
     }
 
@@ -105,6 +112,7 @@ impl View {
             View::ImageViewer(v) => v.subscription(),
             View::UserList(v) => v.subscription(),
             View::Post(v) => v.subscription(),
+            View::DatabaseViewer(v) => v.subscription(),
         }
     }
 }

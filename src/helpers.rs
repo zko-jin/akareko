@@ -15,7 +15,7 @@ use crate::{
 
 mod bloom_filter;
 mod byteable;
-pub use byteable::Byteable;
+pub use byteable::{Byteable, Decodeable, Encodeable};
 
 #[derive(Debug, Clone)]
 pub struct SanitizedString(String);

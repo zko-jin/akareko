@@ -6,11 +6,11 @@ use tracing::{error, info};
 use yosemite::{Session, SessionOptions, style};
 
 use crate::{
-    config::AuroraConfig,
+    config::AkarekoConfig,
     db::{Repositories, user::I2PAddress},
     errors::{DecodeError, ServerError},
-    helpers::Byteable,
-    server::protocol::AuroraProtocolVersion,
+    helpers::{Byteable, b32_from_pub_b64},
+    server::protocol::AkarekoProtocolVersion,
 };
 
 pub mod client;
@@ -18,22 +18,22 @@ mod handler;
 pub mod protocol;
 pub mod proxy;
 
-pub struct AuroraServer {}
+pub struct AkarekoServer {}
 
 #[derive(Clone)]
 struct ServerState {
-    pub config: Arc<RwLock<AuroraConfig>>,
+    pub config: Arc<RwLock<AkarekoConfig>>,
     pub repositories: Repositories,
 }
 
-impl AuroraServer {
-    pub fn new() -> AuroraServer {
-        AuroraServer {}
+impl AkarekoServer {
+    pub fn new() -> AkarekoServer {
+        AkarekoServer {}
     }
 
     pub async fn run(
         &self,
-        config: Arc<RwLock<AuroraConfig>>,
+        config: Arc<RwLock<AkarekoConfig>>,
         repositories: Repositories,
     ) -> Result<(), ServerError> {
         info!("Starting server SAMv3 session");
@@ -66,10 +66,10 @@ impl AuroraServer {
         while let Ok(mut stream) = sam_session.accept().await {
             let state = state.clone();
             tokio::spawn(async move {
-                let address = I2PAddress::new(stream.remote_destination());
+                let address = b32_from_pub_b64(stream.remote_destination()).unwrap();
 
                 loop {
-                    let version = match AuroraProtocolVersion::decode(&mut stream).await {
+                    let version = match AkarekoProtocolVersion::decode(&mut stream).await {
                         Ok(v) => v,
                         Err(e) => match e {
                             DecodeError::IoError(e) => {
@@ -91,7 +91,7 @@ impl AuroraServer {
                     };
 
                     match version {
-                        AuroraProtocolVersion::V1 => {
+                        AkarekoProtocolVersion::V1 => {
                             handler::V1::handle(&mut stream, &state, &address).await;
                         }
                     }

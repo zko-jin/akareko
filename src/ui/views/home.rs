@@ -5,8 +5,14 @@ use iced::{
 
 use crate::ui::{
     AppState, Message,
-    components::modal::{Modal, add_who::AddWhoModal},
-    views::{MangaListView, View, settings::SettingsView, user_list::UserListView},
+    components::{
+        modal::{Modal, add_who::AddWhoModal},
+        toast::Toast,
+    },
+    views::{
+        MangaListView, View, database_viewer::DatabaseViewerView, settings::SettingsView,
+        user_list::UserListView,
+    },
 };
 
 #[derive(Debug, Clone)]
@@ -39,12 +45,9 @@ impl HomeView {
             button(text("SaveTorrent")).on_press(Message::SaveTorrent),
             button(text("User List"))
                 .on_press(Message::ChangeView(View::UserList(UserListView::new()))),
-            button(text("Toast test")).on_press(Message::PostToast(
-                crate::ui::components::toast::Toast::error(
-                    "Success".into(),
-                    "This is a success toast".into()
-                )
-            )),
+            button(text("Database Viewer")).on_press(Message::ChangeView(View::DatabaseViewer(
+                DatabaseViewerView::new(),
+            ))),
         ]
         .into()
     }

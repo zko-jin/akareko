@@ -139,7 +139,7 @@ impl PostView {
                             state.config.private_key(),
                         );
                         return Task::future(async move {
-                            match repositories.posts().await.add_comment(post).await {
+                            match repositories.posts().add_comment(post).await {
                                 Ok(p) => PostMessage::Posted(p).into(),
                                 Err(e) => Message::PostToast(Toast {
                                     title: "Failed to add post".to_string(),
@@ -172,7 +172,6 @@ impl PostView {
                         return Task::future(async move {
                             let res = match repositories
                                 .posts()
-                                .await
                                 .get_posts_by_topic(
                                     topic,
                                     Self::POST_PER_PAGE,

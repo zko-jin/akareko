@@ -1,7 +1,15 @@
 use std::fmt::{Display, Formatter};
 
-use num_enum::TryFromPrimitive;
+#[cfg(feature = "diesel")]
+use diesel::{
+    Selectable,
+    deserialize::FromSqlRow,
+    expression::AsExpression,
+    prelude::{Insertable, Queryable, QueryableByName},
+};
+use num_enum::{IntoPrimitive, TryFromPrimitive};
 use serde::{Deserialize, Serialize};
+use strum_macros::EnumIter;
 use surrealdb::types::SurrealValue;
 
 use crate::{
@@ -18,36 +26,28 @@ mod surreal;
 #[cfg(feature = "surrealdb")]
 pub use surreal::UserRepository;
 
-#[derive(Debug, Clone, TryFromPrimitive, Hash, PartialEq, Eq)]
+#[derive(
+    Debug,
+    Clone,
+    Copy,
+    IntoPrimitive,
+    TryFromPrimitive,
+    Hash,
+    PartialEq,
+    Eq,
+    Default, // FromSqlRow,
+    // AsExpression,
+    EnumIter,
+)]
+// #[diesel(sql_type = diesel::sql_types::Integer)]
 #[repr(u8)]
 pub enum TrustLevel {
-    Ignore,     // Also used for your own user
+    Ignore, // Also used for your own user
+    #[default]
     Unverified, // Default for users we haven't verified the address
-    Untrusted,  // Default for users we have verified the address
+    Untrusted, // Default for users we have verified the address
     Trusted,
     FullTrust, // Set manually for sources
-}
-
-impl SurrealValue for TrustLevel {
-    fn kind_of() -> surrealdb_types::Kind {
-        surrealdb_types::Kind::Number
-    }
-
-    fn into_value(self) -> surrealdb_types::Value {
-        (self as u8).into_value()
-    }
-
-    fn from_value(value: surrealdb_types::Value) -> Result<Self, surrealdb::Error>
-    where
-        Self: Sized,
-    {
-        let value = u8::from_value(value)?;
-        value
-            .try_into()
-            .map_err(|e: num_enum::TryFromPrimitiveError<TrustLevel>| {
-                surrealdb::Error::internal(e.to_string())
-            })
-    }
 }
 
 impl TrustLevel {
@@ -84,6 +84,11 @@ impl Display for TrustLevel {
     Eq,
     byteable_derive::Byteable,
 )]
+#[cfg_attr(
+    feature = "diesel",
+    sql_type = "diesel::sql_types::Text",
+    derive(FromSqlRow, AsExpression)
+)]
 pub struct I2PAddress(String);
 
 impl I2PAddress {
@@ -116,9 +121,10 @@ impl Display for I2PAddress {
     }
 }
 
-#[derive(Debug, Clone, SurrealValue)]
+#[derive(Debug, Clone, byteable_derive::Byteable)]
+#[cfg_attr(feature = "surrealdb", derive(SurrealValue))]
 pub struct User {
-    #[surreal(rename = "id")]
+    #[cfg_attr(feature = "surrealdb", surreal(rename = "id"))]
     pub_key: PublicKey,
     name: String,
     timestamp: Timestamp,
@@ -129,6 +135,7 @@ pub struct User {
     address: I2PAddress,
 
     // Unsigned fields
+    #[byteable(skip)]
     trust: TrustLevel,
 }
 
@@ -183,7 +190,7 @@ impl User {
 
     pub fn new(
         name: String,
-        timestamp: u64,
+        timestamp: Timestamp,
         pub_key: PublicKey,
         signature: Signature,
         address: I2PAddress,
@@ -200,7 +207,7 @@ impl User {
 
     pub fn new_signed(
         name: String,
-        timestamp: u64,
+        timestamp: Timestamp,
         priv_key: &PrivateKey,
         address: I2PAddress,
     ) -> User {
@@ -236,12 +243,16 @@ impl User {
         &self.name
     }
 
-    pub fn timestamp(&self) -> u64 {
+    pub fn timestamp(&self) -> Timestamp {
         self.timestamp
     }
 
     pub fn address(&self) -> &I2PAddress {
         &self.address
+    }
+
+    pub fn into_address(self) -> I2PAddress {
+        self.address
     }
 
     pub fn set_address(&mut self, address: I2PAddress) {
@@ -256,6 +267,10 @@ impl User {
         &self.pub_key
     }
 
+    pub fn into_pub_key(self) -> PublicKey {
+        self.pub_key
+    }
+
     pub fn trust(&self) -> &TrustLevel {
         &self.trust
     }
@@ -264,7 +279,16 @@ impl User {
         self.trust = trust;
     }
 
-    pub fn as_tuple(self) -> (PublicKey, String, u64, I2PAddress, Signature, TrustLevel) {
+    pub fn as_tuple(
+        self,
+    ) -> (
+        PublicKey,
+        String,
+        Timestamp,
+        I2PAddress,
+        Signature,
+        TrustLevel,
+    ) {
         (
             self.pub_key,
             self.name,

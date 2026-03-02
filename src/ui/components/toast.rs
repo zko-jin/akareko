@@ -6,13 +6,19 @@ use iced::{
 use tokio::sync::mpsc;
 use tracing::error;
 
-use crate::ui::Message;
+use crate::{errors::DatabaseError, ui::Message};
 
 #[derive(Debug, Clone)]
 pub struct Toast {
     pub title: String,
     pub body: String,
     pub ty: ToastType,
+}
+
+impl Into<Message> for Toast {
+    fn into(self) -> Message {
+        Message::PostToast(self)
+    }
 }
 
 impl Toast {

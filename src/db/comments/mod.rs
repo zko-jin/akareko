@@ -4,7 +4,8 @@ use surrealdb::types::{SerializationError, SurrealValue};
 use crate::{
     db::{
         Timestamp,
-        index::{Index, tags::IndexTag},
+        index::{Index, content::Content, tags::IndexTag},
+        user::User,
     },
     hash::{Hash, PublicKey, Signature},
 };
@@ -16,7 +17,7 @@ mod surreal;
 #[cfg(feature = "surrealdb")]
 pub use surreal::PostRepository;
 
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, byteable_derive::Byteable)]
+#[derive(Clone, Debug, PartialEq, Hash, Eq, Serialize, Deserialize, byteable_derive::Byteable)]
 pub struct Topic(#[serde(with = "serde_bytes")] [u8; 64]);
 
 impl AsRef<[u8]> for Topic {
@@ -34,14 +35,32 @@ impl Topic {
         Self(post.signature.clone().to_inner())
     }
 
+    pub fn from_content<I: IndexTag>(content: &Content<I>) -> Self {
+        Self(content.signature().clone().to_inner())
+    }
+
+    pub fn from_user(user: &User) -> Self {
+        let mut bytes: [u8; 64] = [0; 64];
+        bytes[..32].copy_from_slice(user.pub_key().as_bytes());
+        Self(bytes)
+    }
+
     pub fn from_entry<I: IndexTag>(index: &Index<I>, enumeration: f32) -> Self {
         let mut bytes = index.hash().inner().to_vec();
         bytes.extend(enumeration.to_le_bytes());
         Self(Hash::digest(&bytes).to_inner())
     }
 
+    pub fn from_bytes(bytes: [u8; 64]) -> Self {
+        Self(bytes)
+    }
+
     pub fn inner(&self) -> &[u8; 64] {
         &self.0
+    }
+
+    pub fn to_inner(&self) -> [u8; 64] {
+        self.0
     }
 }
 
@@ -138,7 +157,7 @@ impl std::hash::Hash for Post {
 // }
 
 impl Post {
-    const TABLE_NAME: &str = "posts";
+    pub const TABLE_NAME: &str = "posts";
 
     pub fn new(
         content: String,

@@ -3,49 +3,49 @@ use tokio::io::{AsyncRead, AsyncReadExt, AsyncWrite, AsyncWriteExt};
 use crate::{
     errors::{ClientError, DecodeError, EncodeError},
     helpers::Byteable,
-    server::handler::AuroraProtocolCommand,
+    server::handler::AkarekoProtocolCommand,
 };
 
 #[repr(u8)]
 #[derive(Debug, Clone, byteable_derive::Byteable)]
-pub enum AuroraProtocolVersion {
+pub enum AkarekoProtocolVersion {
     V1 = 1,
 }
 
 #[derive(Debug)]
-pub(super) struct AuroraProtocolRequest<C: AuroraProtocolCommand> {
+pub(super) struct AkarekoProtocolRequest<C: AkarekoProtocolCommand> {
     pub payload: C::RequestPayload,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub enum AuroraStatus {
+pub enum AkarekoStatus {
     Ok,
     NotFound(String),
     InvalidArgument(String),
     InternalError(String),
 }
 
-impl AuroraStatus {
+impl AkarekoStatus {
     const OK_CODE: u16 = 200;
     const INTERNAL_ERROR_CODE: u16 = 500;
     const INVALID_ARGUMENT_CODE: u16 = 400;
     const NOT_FOUND_CODE: u16 = 404;
 
     pub fn is_ok(&self) -> bool {
-        matches!(self, AuroraStatus::Ok)
+        matches!(self, AkarekoStatus::Ok)
     }
 
     pub fn code(&self) -> u16 {
         match self {
-            AuroraStatus::Ok => Self::OK_CODE,
-            AuroraStatus::InvalidArgument(_) => Self::INVALID_ARGUMENT_CODE,
-            AuroraStatus::NotFound(_) => Self::NOT_FOUND_CODE,
-            AuroraStatus::InternalError(_) => Self::INTERNAL_ERROR_CODE,
+            AkarekoStatus::Ok => Self::OK_CODE,
+            AkarekoStatus::InvalidArgument(_) => Self::INVALID_ARGUMENT_CODE,
+            AkarekoStatus::NotFound(_) => Self::NOT_FOUND_CODE,
+            AkarekoStatus::InternalError(_) => Self::INTERNAL_ERROR_CODE,
         }
     }
 }
 
-impl Byteable for AuroraStatus {
+impl Byteable for AkarekoStatus {
     async fn encode<W: AsyncWrite + Unpin + Send>(
         &self,
         writer: &mut W,
@@ -53,14 +53,14 @@ impl Byteable for AuroraStatus {
         writer.write_u16(self.code()).await?;
 
         match self {
-            AuroraStatus::Ok => (),
-            AuroraStatus::InvalidArgument(message) => {
+            AkarekoStatus::Ok => (),
+            AkarekoStatus::InvalidArgument(message) => {
                 message.encode(writer).await?;
             }
-            AuroraStatus::NotFound(message) => {
+            AkarekoStatus::NotFound(message) => {
                 message.encode(writer).await?;
             }
-            AuroraStatus::InternalError(message) => {
+            AkarekoStatus::InternalError(message) => {
                 message.encode(writer).await?;
             }
         }
@@ -72,22 +72,22 @@ impl Byteable for AuroraStatus {
         let code = reader.read_u16().await?;
 
         let status = match code {
-            Self::OK_CODE => AuroraStatus::Ok,
+            Self::OK_CODE => AkarekoStatus::Ok,
             Self::INVALID_ARGUMENT_CODE => {
                 let message = String::decode(reader).await?;
-                AuroraStatus::InvalidArgument(message)
+                AkarekoStatus::InvalidArgument(message)
             }
             Self::NOT_FOUND_CODE => {
                 let message = String::decode(reader).await?;
-                AuroraStatus::NotFound(message)
+                AkarekoStatus::NotFound(message)
             }
             Self::INTERNAL_ERROR_CODE => {
                 let message = String::decode(reader).await?;
-                AuroraStatus::InternalError(message)
+                AkarekoStatus::InternalError(message)
             }
             _ => {
                 return Err(DecodeError::InvalidEnumVariant {
-                    enum_name: "AuroraStatus",
+                    enum_name: "AkarekoStatus",
                     variant_value: code.to_string(),
                 });
             }
@@ -112,7 +112,7 @@ impl<D: Byteable> StreamDecode<D> {
         Self { d: Either::A(data) }
     }
 
-    fn new_receiver(len: u64) -> Self {
+    pub fn new_receiver(len: u64) -> Self {
         Self { d: Either::B(len) }
     }
 
@@ -148,6 +148,7 @@ impl<D: Byteable> Byteable for StreamDecode<D> {
     ) -> Result<(), EncodeError> {
         match &self.d {
             Either::A(iter) => {
+                (iter.len() as u64).encode(writer).await?;
                 for i in iter {
                     i.encode(writer).await?;
                 }
@@ -167,26 +168,26 @@ impl<D: Byteable> Byteable for StreamDecode<D> {
     }
 }
 
-pub(super) struct AuroraProtocolResponse<P: Byteable, D: Byteable = ()> {
-    status: AuroraStatus,
+pub(super) struct AkarekoProtocolResponse<P: Byteable, D: Byteable = ()> {
+    status: AkarekoStatus,
     payload: Option<P>, // None if status is an error
     data: StreamDecode<D>,
 }
 
-impl<P: Byteable> AuroraProtocolResponse<P, ()> {
+impl<P: Byteable> AkarekoProtocolResponse<P, ()> {
     pub fn ok(payload: P) -> Self {
         Self {
-            status: AuroraStatus::Ok,
+            status: AkarekoStatus::Ok,
             payload: Some(payload),
-            data: StreamDecode::new_receiver(0),
+            data: StreamDecode::new(vec![]),
         }
     }
 }
 
-impl<P: Byteable, D: Byteable> AuroraProtocolResponse<P, D> {
+impl<P: Byteable, D: Byteable> AkarekoProtocolResponse<P, D> {
     pub fn ok_with_data(payload: P, data: Vec<D>) -> Self {
         Self {
-            status: AuroraStatus::Ok,
+            status: AkarekoStatus::Ok,
             payload: Some(payload),
             data: StreamDecode::new(data),
         }
@@ -198,7 +199,7 @@ impl<P: Byteable, D: Byteable> AuroraProtocolResponse<P, D> {
 
     pub fn not_found(message: String) -> Self {
         Self {
-            status: AuroraStatus::NotFound(message),
+            status: AkarekoStatus::NotFound(message),
             payload: None,
             data: StreamDecode::new(vec![]),
         }
@@ -206,7 +207,7 @@ impl<P: Byteable, D: Byteable> AuroraProtocolResponse<P, D> {
 
     pub fn invalid_argument(message: String) -> Self {
         Self {
-            status: AuroraStatus::InvalidArgument(message),
+            status: AkarekoStatus::InvalidArgument(message),
             payload: None,
             data: StreamDecode::new(vec![]),
         }
@@ -214,13 +215,13 @@ impl<P: Byteable, D: Byteable> AuroraProtocolResponse<P, D> {
 
     pub fn internal_error(message: String) -> Self {
         Self {
-            status: AuroraStatus::InternalError(message),
+            status: AkarekoStatus::InternalError(message),
             payload: None,
             data: StreamDecode::new(vec![]),
         }
     }
 
-    pub fn status(&self) -> &AuroraStatus {
+    pub fn status(&self) -> &AkarekoStatus {
         &self.status
     }
 
@@ -243,7 +244,7 @@ impl<P: Byteable, D: Byteable> AuroraProtocolResponse<P, D> {
     }
 }
 
-impl<C: AuroraProtocolCommand> AuroraProtocolRequest<C> {
+impl<C: AkarekoProtocolCommand> AkarekoProtocolRequest<C> {
     pub async fn encode<W: AsyncWrite + Unpin + Send>(
         &self,
         writer: &mut W,
@@ -253,7 +254,7 @@ impl<C: AuroraProtocolCommand> AuroraProtocolRequest<C> {
     }
 }
 
-impl<P: Byteable, D: Byteable> Byteable for AuroraProtocolResponse<P, D> {
+impl<P: Byteable, D: Byteable> Byteable for AkarekoProtocolResponse<P, D> {
     async fn encode<W: AsyncWrite + Unpin + Send>(
         &self,
         writer: &mut W,
@@ -261,16 +262,17 @@ impl<P: Byteable, D: Byteable> Byteable for AuroraProtocolResponse<P, D> {
         self.status.encode(writer).await?;
         if let Some(payload) = &self.payload {
             payload.encode(writer).await?;
+            self.data.encode(writer).await?;
         }
 
         Ok(())
     }
 
     async fn decode<R: AsyncRead + Unpin + Send>(reader: &mut R) -> Result<Self, DecodeError> {
-        let status = AuroraStatus::decode(reader).await?;
+        let status = AkarekoStatus::decode(reader).await?;
 
         if !status.is_ok() {
-            return Ok(AuroraProtocolResponse {
+            return Ok(AkarekoProtocolResponse {
                 status,
                 payload: None,
                 data: StreamDecode::new_receiver(0),
@@ -279,7 +281,7 @@ impl<P: Byteable, D: Byteable> Byteable for AuroraProtocolResponse<P, D> {
 
         let response = P::decode(reader).await?;
         let data = StreamDecode::decode(reader).await?;
-        Ok(AuroraProtocolResponse {
+        Ok(AkarekoProtocolResponse {
             status,
             payload: Some(response),
             data,

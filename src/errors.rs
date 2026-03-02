@@ -2,7 +2,7 @@
 
 use std::string::FromUtf8Error;
 
-use crate::server::protocol::AuroraStatus;
+use crate::server::protocol::AkarekoStatus;
 
 error_set::error_set! {
     Base64Error := {
@@ -34,7 +34,11 @@ error_set::error_set! {
         SurrealError(surrealdb::Error)
     }
 
-    DatabaseError := {Unknown} || SurrealError
+    // DieselError := {
+    //     DieselError(diesel::result::Error)
+    // }
+
+    DatabaseError := {Unknown} || SurrealError /*|| DieselError */
 
     ServerError := YosemiteError
 
@@ -42,7 +46,7 @@ error_set::error_set! {
         InvalidSignature
     }
 
-    ClientError := { MissingPayload, UnexpectedResponseCode { status: AuroraStatus } } || EncodeError
+    ClientError := { MissingPayload, UnexpectedResponseCode { status: AkarekoStatus } } || EncodeError
             || DecodeError || YosemiteError || InvalidSignature || DatabaseError
 
     EncodeError := {
@@ -58,6 +62,19 @@ error_set::error_set! {
             variant_value: String,
             enum_name: &'static str
         },
+        InvalidData,
         FromUtf8Error(FromUtf8Error)
     } || IoError
+}
+
+impl serde::ser::Error for EncodeError {
+    fn custom<T: std::fmt::Display>(msg: T) -> Self {
+        EncodeError::InvalidData
+    }
+}
+
+impl serde::de::Error for DecodeError {
+    fn custom<T: std::fmt::Display>(msg: T) -> Self {
+        DecodeError::InvalidData
+    }
 }

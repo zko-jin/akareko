@@ -45,12 +45,12 @@ macro_rules! handler {
             }
 
             $(
-                impl AuroraProtocolCommandMetadata for $handler {
+                impl AkarekoProtocolCommandMetadata for $handler {
                     type CommandType = [<Commands $version>];
 
                     const COMMAND: [<Commands $version>] =
                         [<Commands $version>]::$command;
-                    const VERSION: AuroraProtocolVersion = AuroraProtocolVersion::$version;
+                    const VERSION: AkarekoProtocolVersion = AkarekoProtocolVersion::$version;
                 }
             )*
 
@@ -63,7 +63,7 @@ macro_rules! handler {
                     match command {
                         $(
                             [<Commands $version>]::$command => {
-                                <$handler as AuroraProtocolCommandHandler>::handle(stream, state, address).await;
+                                <$handler as AkarekoProtocolCommandHandler>::handle(stream, state, address).await;
                             }
                         )*
                     }

@@ -1,6 +1,8 @@
 use std::fmt::Display;
 
 use base64::{Engine as _, engine::general_purpose::STANDARD_NO_PAD};
+#[cfg(feature = "diesel")]
+use diesel::{deserialize::FromSqlRow, expression::AsExpression};
 use serde::{Deserialize, Serialize};
 use sha2::Digest;
 
@@ -11,8 +13,49 @@ use crate::errors::Base64Error;
 mod keys;
 pub use keys::{PrivateKey, PublicKey, Signable, Signature};
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, byteable_derive::Byteable)]
+#[derive(
+    Debug,
+    Clone,
+    PartialEq,
+    Eq,
+    Serialize,
+    Deserialize,
+    // AsExpression,
+    // FromSqlRow,
+    byteable_derive::Byteable,
+)]
+// #[sql_type = "diesel::sql_types::Binary"]
 pub struct Hash(#[serde(with = "serde_bytes")] [u8; 64]);
+
+#[cfg(feature = "sqlite")]
+pub mod sqlite {
+    use diesel::{
+        deserialize::FromSql,
+        serialize::{self, IsNull, Output, ToSql},
+        sql_types::Binary,
+        sqlite::{Sqlite, SqliteValue},
+    };
+
+    use crate::hash::Hash;
+
+    impl FromSql<Binary, Sqlite> for Hash {
+        fn from_sql(bytes: SqliteValue) -> diesel::deserialize::Result<Hash> {
+            let value = match <Vec<u8> as FromSql<Binary, Sqlite>>::from_sql(bytes)?.try_into() {
+                Ok(value) => value,
+                Err(e) => return Err(format!("Invalid hash size").into()),
+            };
+
+            Ok(Hash(value))
+        }
+    }
+
+    impl ToSql<Binary, Sqlite> for Hash {
+        fn to_sql<'b>(&'b self, out: &mut Output<'b, '_, Sqlite>) -> serialize::Result {
+            out.set_value(&self.0[..]);
+            Ok(IsNull::No)
+        }
+    }
+}
 
 impl AsRef<[u8]> for Hash {
     fn as_ref(&self) -> &[u8] {

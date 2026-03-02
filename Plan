@@ -37,3 +37,16 @@ Post diffing
     - Send an Bloom filter of everything after the last sync
 
 Add compression to db
+
+Routine
+    - Every hour check for followed indexes
+        - Main nodes should already be updated
+        - Check who posted other contents and ask them for updates
+    - Every 5 minutes check event log on main nodes
+    -
+
+Offer a button to manually sync with a poster node on index pages
+
+Option to run a minimal node, only serving it's own content (better for scans that users want to follow)
+
+Option to add minimum timestamps so other peers can't just ask for too much content

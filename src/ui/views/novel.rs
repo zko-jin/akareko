@@ -9,6 +9,7 @@ use tracing::info;
 use crate::{
     db::{
         comments::Topic,
+        follow_index::IndexFollow,
         index::{
             Index,
             content::Content,
@@ -18,7 +19,10 @@ use crate::{
     helpers::SanitizedString,
     ui::{
         AppState, Message,
-        icons::{CHAT_ICON, CHECK_CIRCLE_ICON, DOWNLOAD_ICON, SEEN_ICON, UNSEEN_ICON},
+        components::toast::Toast,
+        icons::{
+            BOOK_BOOKMARK_ICON, CHAT_ICON, CHECK_CIRCLE_ICON, DOWNLOAD_ICON, SEEN_ICON, UNSEEN_ICON,
+        },
         style,
         views::{
             View, ViewMessage, add_chapter::AddMangaChapterView, image_viewer::ImageViewerView,
@@ -30,32 +34,36 @@ use crate::{
 // ==================== End Imports ====================
 
 #[derive(Debug, Clone)]
-pub struct NovelView {
-    novel: Index<MangaTag>,
+pub struct MangaView {
+    follow: bool,
+    manga: Index<MangaTag>,
     chapters: Vec<Content<MangaTag>>,
     pub torrents: Vec<Option<watch::Receiver<AnawtTorrentStatus>>>,
 }
 
 #[derive(Debug, Clone)]
-pub enum NovelMessage {
+pub enum MangaMessage {
     ContentLoaded(Vec<Content<MangaTag>>),
     LoadedTorrentWatcher(Vec<Option<watch::Receiver<AnawtTorrentStatus>>>),
     ReloadTorrents,
     DownloadTorrentAndReload { magnet: String, path: String },
     UpdateProgress(usize, usize, f32),
     TorrentStatusUpdated,
+    LoadedFollow(bool),
+    ToggleFollow,
 }
 
-impl From<NovelMessage> for Message {
-    fn from(m: NovelMessage) -> Self {
+impl From<MangaMessage> for Message {
+    fn from(m: MangaMessage) -> Self {
         Message::ViewMessage(ViewMessage::Novel(m))
     }
 }
 
-impl NovelView {
+impl MangaView {
     pub fn new(novel: Index<MangaTag>) -> Self {
         Self {
-            novel,
+            follow: false,
+            manga: novel,
             chapters: vec![],
             torrents: Vec::new(),
         }
@@ -65,10 +73,13 @@ impl NovelView {
         if let View::Novel(v) = &mut state.view {
             if let Some(repositories) = &state.repositories {
                 let repositories = repositories.clone();
-                let novel_hash = v.novel.hash().clone();
+                let novel_hash = v.manga.hash().clone();
                 return Task::future(async move {
-                    let chapters = repositories.index().await.get_contents(novel_hash).await;
-                    NovelMessage::ContentLoaded(chapters).into()
+                    let chapters = repositories
+                        .index()
+                        .get_filtered_index_contents(novel_hash, 0, None)
+                        .await;
+                    MangaMessage::ContentLoaded(chapters.unwrap()).into()
                 });
             }
         }
@@ -80,15 +91,23 @@ impl NovelView {
     }
 
     pub fn view(&self, _: &AppState) -> iced::Element<'_, Message> {
-        let mut column: Vec<iced::Element<Message>> = vec![text(self.novel.title().clone()).into()];
+        let mut column = Column::new().push(row![
+            text(self.manga.title().clone()),
+            button(
+                svg(svg::Handle::from_memory(BOOK_BOOKMARK_ICON))
+                    .height(Length::Fixed(24.0))
+                    .width(Length::Fixed(24.0))
+                    .style(|_, _| svg::Style {
+                        color: Some(Color::WHITE),
+                    })
+            )
+            .style(style::icon_button)
+            .on_press(MangaMessage::ToggleFollow.into())
+        ]);
 
-        column.push(
-            button(text("Add Chapter"))
-                .on_press(Message::ChangeView(View::AddChapter(
-                    AddMangaChapterView::new(self.novel.clone()),
-                )))
-                .into(),
-        );
+        column = column.push(button(text("Add Chapter")).on_press(Message::ChangeView(
+            View::AddChapter(AddMangaChapterView::new(self.manga.clone())),
+        )));
 
         for i in 0..self.chapters.len() {
             let chapter = &self.chapters[i];
@@ -123,12 +142,12 @@ impl NovelView {
                     )
                     .style(style::icon_button)
                     .on_press(
-                        NovelMessage::DownloadTorrentAndReload {
+                        MangaMessage::DownloadTorrentAndReload {
                             magnet: chapter.magnet_link.clone().0,
                             path: format!(
                                 "./data/{}/{}/{}",
                                 MangaTag::TAG,
-                                SanitizedString::new(self.novel.title()).as_str(),
+                                SanitizedString::new(self.manga.title()).as_str(),
                                 chapter.signature().as_base64_url()
                             ),
                         }
@@ -147,55 +166,31 @@ impl NovelView {
                     .into(),
                 };
 
-                column.push(
-                    row![
-                        button(text(e.title.clone()))
-                            .on_press_maybe(match select_message {
-                                ContentState::Downloading(_) => None,
-                                ContentState::Download => None,
-                                ContentState::Ready =>
-                                    Some(Message::ChangeView(View::ImageViewer(
-                                        // TODO: Instead of using the chapter signature for the path
-                                        // we should use the hash of the torrent
-                                        ImageViewerView::new(
-                                            format!(
-                                                "./data/{}/{}/{}/{}",
-                                                MangaTag::TAG,
-                                                SanitizedString::new(self.novel.title()).as_str(),
-                                                chapter.signature().as_base64_url(),
-                                                chapter.entries()[j].path
-                                            )
-                                            .into(),
-                                        )
-                                    ))),
-                            })
-                            .width(Length::Fill),
-                        download_element,
-                        if e.progress < 1.0 {
-                            button(
-                                svg(svg::Handle::from_memory(UNSEEN_ICON))
-                                    .height(Length::Fixed(24.0))
-                                    .width(Length::Fixed(24.0))
-                                    .style(|_, _| svg::Style {
-                                        color: Some(Color::WHITE),
-                                    }),
-                            )
-                            .style(style::icon_button)
-                            .on_press(NovelMessage::UpdateProgress(j, i, 1.0).into())
-                        } else {
-                            button(
-                                svg(svg::Handle::from_memory(SEEN_ICON))
-                                    .height(Length::Fixed(24.0))
-                                    .width(Length::Fixed(24.0))
-                                    .style(|_, _| svg::Style {
-                                        color: Some(Color::WHITE),
-                                    }),
-                            )
-                            .style(style::icon_button)
-                            .on_press(NovelMessage::UpdateProgress(j, i, 0.0).into())
-                        },
+                column = column.push(row![
+                    button(text(e.title.clone()))
+                        .on_press_maybe(match select_message {
+                            ContentState::Downloading(_) => None,
+                            ContentState::Download => None,
+                            ContentState::Ready => Some(Message::ChangeView(View::ImageViewer(
+                                // TODO: Instead of using the chapter signature for the path
+                                // we should use the hash of the torrent
+                                ImageViewerView::new(
+                                    format!(
+                                        "./data/{}/{}/{}/{}",
+                                        MangaTag::TAG,
+                                        SanitizedString::new(self.manga.title()).as_str(),
+                                        chapter.signature().as_base64_url(),
+                                        chapter.entries()[j].path
+                                    )
+                                    .into(),
+                                )
+                            ))),
+                        })
+                        .width(Length::Fill),
+                    download_element,
+                    if e.progress < 1.0 {
                         button(
-                            svg(svg::Handle::from_memory(CHAT_ICON))
+                            svg(svg::Handle::from_memory(UNSEEN_ICON))
                                 .height(Length::Fixed(24.0))
                                 .width(Length::Fixed(24.0))
                                 .style(|_, _| svg::Style {
@@ -203,39 +198,86 @@ impl NovelView {
                                 }),
                         )
                         .style(style::icon_button)
-                        .on_press(Message::ChangeView(View::Post(PostView::new(
-                            Topic::from_entry(&self.novel, e.enumeration)
-                        ))))
-                    ]
-                    .into(),
-                );
+                        .on_press(MangaMessage::UpdateProgress(j, i, 1.0).into())
+                    } else {
+                        button(
+                            svg(svg::Handle::from_memory(SEEN_ICON))
+                                .height(Length::Fixed(24.0))
+                                .width(Length::Fixed(24.0))
+                                .style(|_, _| svg::Style {
+                                    color: Some(Color::WHITE),
+                                }),
+                        )
+                        .style(style::icon_button)
+                        .on_press(MangaMessage::UpdateProgress(j, i, 0.0).into())
+                    },
+                    button(
+                        svg(svg::Handle::from_memory(CHAT_ICON))
+                            .height(Length::Fixed(24.0))
+                            .width(Length::Fixed(24.0))
+                            .style(|_, _| svg::Style {
+                                color: Some(Color::WHITE),
+                            }),
+                    )
+                    .style(style::icon_button)
+                    .on_press(Message::ChangeView(View::Post(PostView::new(
+                        Topic::from_entry(&self.manga, e.enumeration)
+                    ))))
+                ]);
             }
         }
 
-        Column::from_vec(column).width(Length::Fill).into()
+        column.width(Length::Fill).into()
     }
 
-    pub fn update(m: NovelMessage, state: &mut AppState) -> Task<Message> {
+    pub fn update(m: MangaMessage, state: &mut AppState) -> Task<Message> {
         if let View::Novel(v) = &mut state.view {
             match m {
-                NovelMessage::ContentLoaded(chapters) => {
+                MangaMessage::ContentLoaded(chapters) => {
                     v.torrents = vec![None; chapters.len()];
                     v.chapters = chapters;
-                    return Task::done(NovelMessage::ReloadTorrents.into());
+                    return Task::done(MangaMessage::ReloadTorrents.into());
                 }
-                NovelMessage::UpdateProgress(j, i, p) => {
+                MangaMessage::UpdateProgress(j, i, p) => {
                     v.chapters[i].update_entry_progress(j, p);
                 }
-                NovelMessage::LoadedTorrentWatcher(watchers) => {
+                MangaMessage::ToggleFollow => {
+                    v.follow = true;
+                    if let Some(repositories) = &state.repositories {
+                        let repositories = repositories.clone();
+                        let index = v.manga.hash().clone();
+                        return Task::future(async move {
+                            let f = match repositories
+                                .index_follow()
+                                .get_index_follow::<MangaTag>(index)
+                                .await
+                            {
+                                Ok(f) => f.is_some(),
+                                Err(e) => {
+                                    return Message::PostToast(Toast::error(
+                                        "Failed to get follow status".into(),
+                                        e.to_string(),
+                                    ));
+                                }
+                            };
+
+                            MangaMessage::LoadedFollow(f).into()
+                        });
+                    }
+                }
+                MangaMessage::LoadedFollow(f) => {
+                    v.follow = f;
+                }
+                MangaMessage::LoadedTorrentWatcher(watchers) => {
                     info!("Loaded torrent watcher");
                     v.torrents = watchers;
                 }
-                NovelMessage::DownloadTorrentAndReload { magnet, path } => {
+                MangaMessage::DownloadTorrentAndReload { magnet, path } => {
                     info!("Downloading and reloading: {}", magnet);
                     return Task::done(Message::DownloadTorrent { magnet, path })
-                        .chain(Task::done(NovelMessage::ReloadTorrents.into()));
+                        .chain(Task::done(MangaMessage::ReloadTorrents.into()));
                 }
-                NovelMessage::ReloadTorrents => {
+                MangaMessage::ReloadTorrents => {
                     info!("Reloading torrents");
                     let torrent_client = state.torrent_client.clone();
                     if let Some(torrent_client) = torrent_client {
@@ -254,11 +296,11 @@ impl NovelView {
                                 watchers[i] = rx;
                             }
 
-                            NovelMessage::LoadedTorrentWatcher(watchers).into()
+                            MangaMessage::LoadedTorrentWatcher(watchers).into()
                         });
                     }
                 }
-                NovelMessage::TorrentStatusUpdated => {}
+                MangaMessage::TorrentStatusUpdated => {}
             }
         }
 

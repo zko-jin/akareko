@@ -28,10 +28,16 @@ pub struct ContentEntry<T: IndexTag> {
     pub title: String,
     pub enumeration: f32,
     pub path: String,
-    pub content: T::Content,
 
-    // Metadata
     pub progress: f32,
+
+    pub extra_metadata: T::ExtraMetadata,
+}
+
+impl<I: IndexTag> std::hash::Hash for Content<I> {
+    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+        self.index_hash.hash(state)
+    }
 }
 
 impl<T: IndexTag> ToBytes for ContentEntry<T> {
@@ -39,7 +45,7 @@ impl<T: IndexTag> ToBytes for ContentEntry<T> {
         let mut bytes: Vec<u8> = self.title.as_bytes().to_vec();
         bytes.extend(self.enumeration.to_be_bytes());
         bytes.extend(self.path.as_bytes());
-        bytes.extend(self.content.to_bytes());
+        bytes.extend(self.extra_metadata.to_bytes());
         bytes
     }
 }
@@ -52,7 +58,7 @@ impl<T: IndexTag> Byteable for ContentEntry<T> {
         self.title.encode(writer).await?;
         self.enumeration.encode(writer).await?;
         self.path.encode(writer).await?;
-        self.content.encode(writer).await?;
+        self.extra_metadata.encode(writer).await?;
         Ok(())
     }
 
@@ -64,7 +70,7 @@ impl<T: IndexTag> Byteable for ContentEntry<T> {
             title: String::decode(reader).await?,
             enumeration: f32::decode(reader).await?,
             path: String::decode(reader).await?,
-            content: T::Content::decode(reader).await?,
+            extra_metadata: T::ExtraMetadata::decode(reader).await?,
             progress: 0.0,
         })
     }

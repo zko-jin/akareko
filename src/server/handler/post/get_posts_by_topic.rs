@@ -5,12 +5,12 @@ use crate::{
         comments::{Post, Topic},
         user::I2PAddress,
     },
-    server::{ServerState, handler::AuroraProtocolCommand, protocol::AuroraProtocolResponse},
+    server::{ServerState, handler::AkarekoProtocolCommand, protocol::AkarekoProtocolResponse},
 };
 
 pub struct GetPostsByTopic;
 
-impl AuroraProtocolCommand for GetPostsByTopic {
+impl AkarekoProtocolCommand for GetPostsByTopic {
     type RequestPayload = GetPostsByTopicRequest;
     type ResponsePayload = GetPostsByTopicResponse;
     type ResponseData = Post;
@@ -19,18 +19,17 @@ impl AuroraProtocolCommand for GetPostsByTopic {
         req: Self::RequestPayload,
         state: &ServerState,
         _address: &I2PAddress,
-    ) -> AuroraProtocolResponse<Self::ResponsePayload, Self::ResponseData> {
+    ) -> AkarekoProtocolResponse<Self::ResponsePayload, Self::ResponseData> {
         let Ok(posts) = state
             .repositories
             .posts()
-            .await
-            .get_all_posts_by_topic(req.topic, req.timestamp, req.filter)
+            .get_filtered_posts_by_topic(req.topic, req.timestamp, req.filter)
             .await
         else {
-            return AuroraProtocolResponse::internal_error("Database error".to_string());
+            return AkarekoProtocolResponse::internal_error("Database error".to_string());
         };
 
-        AuroraProtocolResponse::ok_with_data(GetPostsByTopicResponse {}, posts)
+        AkarekoProtocolResponse::ok_with_data(GetPostsByTopicResponse {}, posts)
     }
 }
 

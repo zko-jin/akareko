@@ -3,12 +3,13 @@ use iced::{
     widget::{button, column, container, pick_list, row, text, text_input},
 };
 use rclite::Arc;
+use tracing::{error, info};
 
 use crate::{
     db::user::{I2PAddress, TrustLevel, User},
     errors::ClientError,
     ui::{
-        AppState, Message,
+        AppState, ClientPool, Message,
         components::{
             modal::{Modal, ModalMessage},
             toast::{Toast, ToastType},
@@ -92,16 +93,20 @@ impl AddWhoModal {
                 AddWhoModalMessage::SearchAddress => {
                     v.loading = true;
 
-                    if let Some(client) = &state.client {
+                    if let Some(pool) = &state.client_pool {
                         let i2p = v.i2p.clone();
-                        let mut client = client.clone();
+                        let pool = pool.clone();
                         return Task::future(async move {
+                            let mut client = pool.get_client().await;
                             let user = match client.who(&I2PAddress::new(i2p)).await {
                                 Ok(user) => user,
                                 Err(e) => {
+                                    error!("Failed to get user: {}", e);
                                     return AddWhoModalMessage::FailedGetUser(Arc::new(e)).into();
                                 }
                             };
+
+                            info!("Got user: {:?}", user);
 
                             AddWhoModalMessage::GotUser(user).into()
                         });
@@ -113,7 +118,7 @@ impl AddWhoModal {
                         if let Some(repositories) = &state.repositories {
                             let repository = repositories.clone();
                             return Task::future(async move {
-                                repository.user().await.upsert_user(user).await.unwrap();
+                                repository.user().upsert_user(user).await.unwrap();
                                 AddWhoModalMessage::AddedUser.into()
                             });
                         }

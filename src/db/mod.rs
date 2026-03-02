@@ -1,5 +1,13 @@
 use std::fmt::Debug;
+#[cfg(feature = "surrealdb")]
+use std::path::Path;
 
+#[cfg(feature = "diesel")]
+use diesel::SqliteConnection;
+#[cfg(feature = "diesel")]
+use diesel_async::pooled_connection::{AsyncDieselConnectionManager, bb8::Pool};
+#[cfg(feature = "diesel")]
+use diesel_async::sync_connection_wrapper::SyncConnectionWrapper;
 use rclite::Arc;
 
 use serde::{Deserialize, Serialize};
@@ -14,11 +22,18 @@ use tokio::{
 };
 use tracing::info;
 
-use crate::db::{comments::PostRepository, follow_index::IndexFollowRepository};
+use crate::db::user::I2PAddress;
+use crate::db::{
+    comments::Post,
+    follow_index::IndexFollow,
+    index::tags::{IndexTag, MangaTag},
+};
 #[cfg(feature = "surrealdb")]
+use crate::db::{comments::PostRepository, follow_index::IndexFollowRepository};
+// use crate::db::{comments::PostRepository, follow_index::IndexFollowRepository};
 use crate::errors::DatabaseError;
 use crate::{
-    config::AuroraConfig,
+    config::AkarekoConfig,
     db::{
         index::IndexRepository,
         user::{User, UserRepository},
@@ -34,11 +49,16 @@ use crate::{
 // ==================== End Imports ====================
 
 pub mod comments;
+pub mod event;
 pub mod follow_index;
 pub mod index;
+pub mod schedule;
+#[cfg(feature = "diesel")]
+pub mod schema;
 pub mod user;
 
 pub type Timestamp = u64;
+pub const BLOOM_FILTER_FALSE_POSITIVE_RATE: f64 = 0.0001;
 
 pub struct PaginateSearch<T> {
     search: T,
@@ -79,77 +99,115 @@ impl Byteable for Magnet {
     }
 }
 
-#[derive(Debug, Clone)]
+#[cfg(feature = "sqlite")]
+type Connection = SyncConnectionWrapper<SqliteConnection>;
+
+#[cfg(feature = "sqlite")]
+type DbPool = Pool<Connection>;
+
+#[derive(Clone)]
 pub struct Repositories {
     #[cfg(feature = "surrealdb")]
     pub db: Surreal<Db>,
     #[cfg(feature = "sqlite")]
-    pub db: Pool,
-    config: Arc<RwLock<AuroraConfig>>,
+    pub db: DbPool,
+}
+
+impl std::fmt::Debug for Repositories {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("Repositories").finish()
+    }
 }
 
 #[cfg(feature = "sqlite")]
 impl Repositories {
-    pub async fn initialize(config: Arc<RwLock<AuroraConfig>>) -> Self {}
+    pub async fn initialize(config: Arc<RwLock<AkarekoConfig>>) -> Self {
+        use diesel_async::{AsyncConnection, pooled_connection::AsyncDieselConnectionManager};
 
-    pub async fn get_random_contents(
-        &self,
-        count: u16,
-    ) -> Result<Vec<TaggedContent>, DatabaseError> {
-        // let mut tagged_contents = Vec::with_capacity(count as usize);
+        let manager = AsyncDieselConnectionManager::new("./database/sqlite.db");
+        let db = DbPool::builder().build(manager).await.unwrap();
 
-        let conn = self.db.get().await.unwrap();
-        let result: i64 = conn
-            .interact(|conn| {
-                let mut stmt = conn.prepare("SELECT 1")?;
-                let mut rows = stmt.query([])?;
-                let row = rows.next()?.unwrap();
-                row.get(0)
-            })
-            .await
-            .unwrap()
-            .unwrap();
-        todo!()
-        // let novels: Vec<Content<NovelTag>> = conn.
-
-        // .prepare("SELECT * FROM novels ORDER BY RANDOM() LIMIT ?1")
-        // .unwrap()
-        // .query_map([novel_tag], |row| Ok(TaggedContent::from(row.get(0)?)))
-        // .unwrap()
-        // .take(0)?;
-
-        // tagged_contents.extend(novels.into_iter().map(TaggedContent::from));
-
-        // Ok(tagged_contents)
+        Self { db }
     }
 
-    pub async fn user(&self) -> UserRepository {
-        UserRepository::new(self.db.get().await.unwrap())
+    pub fn user(&self) -> UserRepository {
+        UserRepository::new(self.db.clone())
     }
 
-    pub async fn index(&self) -> IndexRepository {
-        IndexRepository::new(self.db.get().await.unwrap())
+    pub fn index(&self) -> IndexRepository {
+        IndexRepository::new(self.db.clone())
     }
 }
 
-const CACHE_TABLE: &'static str = "cache";
-fn cache_index_key(index_hash: &Hash, user: &PublicKey) -> String {
-    format!("{}_{}", index_hash.as_base64(), user.to_base64())
+#[derive(Debug, Clone, SurrealValue)]
+pub struct FullSyncTarget {
+    #[surreal(rename = "id")]
+    pub pub_key: PublicKey,
+    pub last_sync: Timestamp,
+}
+
+impl FullSyncTarget {
+    const TABLE_NAME: &'static str = "full_sync_targets";
+
+    pub fn new(pub_key: PublicKey, last_sync: Timestamp) -> Self {
+        Self { pub_key, last_sync }
+    }
+
+    pub fn from_user(user: &User) -> Self {
+        Self {
+            pub_key: user.pub_key().clone(),
+            last_sync: 0,
+        }
+    }
 }
 
 #[cfg(feature = "surrealdb")]
 impl Repositories {
-    pub async fn initialize(config: Arc<RwLock<AuroraConfig>>) -> Self {
+    /// Use Repositories::initialize() instead, this function is only so we can run tests
+    /// without setting a user and in memory
+    pub async fn setup(db: Surreal<Db>) -> Self {
+        db.use_ns("akareko").use_db("main").await.unwrap();
+
+        let mut init_query = String::new();
+
+        for table in [
+            MangaTag::TAG,
+            MangaTag::CONTENT_TABLE,
+            &IndexFollow::<MangaTag>::table_name(),
+            User::TABLE_NAME,
+            Post::TABLE_NAME,
+            FullSyncTarget::TABLE_NAME,
+            "events",
+        ] {
+            init_query.push_str(&format!("DEFINE TABLE IF NOT EXISTS {};\n", table));
+        }
+
+        init_query.push_str(
+            "DEFINE INDEX IF NOT EXISTS eventStamps ON TABLE events FIELDS timestamp, event_type;",
+        );
+
+        db.query(init_query).await.unwrap();
+        Self { db }
+    }
+
+    pub async fn in_memory() -> Self {
+        let db: Surreal<Db> = Surreal::new::<surrealdb::engine::local::Mem>(())
+            .await
+            .unwrap();
+        Self::setup(db).await
+    }
+
+    pub async fn initialize(config: &AkarekoConfig) -> Self {
+        let db: Surreal<Db> = Surreal::new::<SurrealKv>("./database/surreal")
+            .await
+            .unwrap();
+
         info!("Initializing SurrealDB");
-        let db = Surreal::new::<SurrealKv>("database").await.unwrap();
-        db.use_ns("aurora").use_db("main").await.unwrap();
-        let repositories = Repositories { db, config };
+        let repositories = Self::setup(db).await;
         info!("Initialized SurrealDB");
 
         {
-            let config = repositories.config.read().await;
-
-            let user_repository = repositories.user().await;
+            let user_repository = repositories.user();
             match user_repository.get_user(&config.public_key()).await {
                 Err(_) => {
                     use crate::db::user::TrustLevel;
@@ -162,7 +220,6 @@ impl Repositories {
                     );
                     user.set_trust(TrustLevel::Ignore);
                     let res = user_repository.upsert_user(user).await.unwrap();
-                    dbg!(res);
                 }
                 _ => {}
             }
@@ -171,82 +228,51 @@ impl Repositories {
         repositories
     }
 
-    // pub async fn get_random_contents(
-    //     &self,
-    //     count: u16,
-    // ) -> Result<Vec<TaggedContent>, DatabaseError> {
-    //     let mut tagged_contents = Vec::with_capacity(count as usize);
-
-    //     let novel_tag = count;
-
-    //     let novels: Vec<Content<MangaTag>> = self
-    //         .db
-    //         .query(format!(
-    //             "SELECT * FROM {} ORDER BY rand() LIMIT $count",
-    //             MangaTag::CONTENT_TABLE
-    //         ))
-    //         .bind(("count", novel_tag))
-    //         .await?
-    //         .take(0)?;
-
-    //     tagged_contents.extend(novels.into_iter().map(TaggedContent::from));
-
-    //     Ok(tagged_contents)
-    // }
-
-    pub async fn add_cache_index(
+    pub async fn upsert_full_sync_address(
         &self,
-        index_hash: &Hash,
-        user: &PublicKey,
-        timestamp: Timestamp,
+        target: FullSyncTarget,
     ) -> Result<(), DatabaseError> {
-        let _: Option<surrealdb_types::Value> = self
+        use surrealdb_types::Value;
+
+        let _: Vec<Value> = self
             .db
-            .upsert(surrealdb_types::RecordId::new(
-                CACHE_TABLE,
-                cache_index_key(index_hash, user),
-            ))
-            .content(timestamp)
+            .upsert(FullSyncTarget::TABLE_NAME)
+            .content(target)
             .await?;
 
         Ok(())
     }
 
-    pub async fn check_cache_index(
-        &self,
-        index_hash: &Hash,
-        user: &PublicKey,
-    ) -> Result<Timestamp, DatabaseError> {
-        const QUERY: &'static str =
-            const_format::formatcp!("SELECT * FROM {}:$cache;", CACHE_TABLE);
-
-        let results: Vec<Timestamp> = self
+    pub async fn remove_full_sync_address(&self, pub_key: PublicKey) -> Result<(), DatabaseError> {
+        use surrealdb_types::{RecordId, Value};
+        let _: Option<Value> = self
             .db
-            .query(QUERY)
-            .bind(("cache", cache_index_key(index_hash, user)))
-            .await?
-            .take(0)?;
-
-        match results.len() {
-            0 => Ok(0),
-            1 => Ok(results.into_iter().next().unwrap()),
-            _ => Err(DatabaseError::Unknown),
-        }
+            .delete(RecordId::new(
+                FullSyncTarget::TABLE_NAME,
+                pub_key.to_base64(),
+            ))
+            .await?;
+        Ok(())
     }
 
-    pub async fn user(&self) -> UserRepository<'_> {
+    pub async fn full_sync_addresses(&self) -> Result<Vec<FullSyncTarget>, DatabaseError> {
+        let addresses: Vec<FullSyncTarget> = self.db.select(FullSyncTarget::TABLE_NAME).await?;
+        Ok(addresses)
+    }
+
+    pub fn user(&self) -> UserRepository<'_> {
         UserRepository::new(&self.db)
     }
 
-    pub async fn index(&self) -> IndexRepository<'_> {
+    pub fn index(&self) -> IndexRepository<'_> {
         IndexRepository::new(&self.db)
     }
 
-    pub async fn posts(&self) -> PostRepository<'_> {
+    pub fn posts(&self) -> PostRepository<'_> {
         PostRepository::new(&self.db)
     }
 
-    pub async fn index_follow(&self) -> IndexFollowRepository<'_> {
+    pub fn index_follow(&self) -> IndexFollowRepository<'_> {
         IndexFollowRepository::new(&self.db)
     }
 }

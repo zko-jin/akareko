@@ -2,17 +2,13 @@ use crate::{
     db::user::{I2PAddress, User},
     hash::{PrivateKey, Signature},
     helpers::now_timestamp,
-    server::{
-        ServerState,
-        handler::{AuroraProtocolCommand, users::UserResponse},
-        protocol::AuroraProtocolResponse,
-    },
+    server::{ServerState, handler::AkarekoProtocolCommand, protocol::AkarekoProtocolResponse},
 };
 
 #[derive(Debug)]
 pub struct Who;
 
-impl AuroraProtocolCommand for Who {
+impl AkarekoProtocolCommand for Who {
     type RequestPayload = WhoRequest;
     type ResponsePayload = WhoResponse;
     type ResponseData = ();
@@ -21,7 +17,7 @@ impl AuroraProtocolCommand for Who {
         _: Self::RequestPayload,
         state: &ServerState,
         address: &I2PAddress,
-    ) -> AuroraProtocolResponse<Self::ResponsePayload, Self::ResponseData> {
+    ) -> AkarekoProtocolResponse<Self::ResponsePayload, Self::ResponseData> {
         let response: Option<WhoResponse> = {
             let config = state.config.read().await;
             let user_pub_key = config.public_key();
@@ -29,7 +25,6 @@ impl AuroraProtocolCommand for Who {
             match state
                 .repositories
                 .user()
-                .await
                 .get_user(user_pub_key)
                 .await
                 .unwrap()
@@ -40,9 +35,9 @@ impl AuroraProtocolCommand for Who {
         };
 
         if let Some(response) = response {
-            AuroraProtocolResponse::ok(response)
+            AkarekoProtocolResponse::ok(response)
         } else {
-            AuroraProtocolResponse::not_found("User not found".to_string())
+            AkarekoProtocolResponse::not_found("User not found".to_string())
         }
     }
 }
@@ -52,7 +47,7 @@ pub struct WhoRequest {}
 
 #[derive(Debug, byteable_derive::Byteable)]
 pub struct WhoResponse {
-    pub user: UserResponse,
+    pub user: User,
     pub timestamp: u64,
     pub signature: Signature, // Timestamp + Address of requesting user
 }
@@ -79,6 +74,6 @@ impl WhoResponse {
 
     pub fn verify(&self, request_address: &I2PAddress) -> bool {
         let bytes = self.verification_bytes(request_address);
-        self.user.pub_key.verify(&bytes, &self.signature)
+        self.user.pub_key().verify(&bytes, &self.signature)
     }
 }

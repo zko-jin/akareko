@@ -10,6 +10,18 @@ pub trait Byteable {
         Self: Sized;
 }
 
+// Replace byteable later with these 2
+pub trait Encodeable {
+    async fn encode<W: AsyncWrite + Unpin + Send>(&self, writer: &mut W)
+    -> Result<(), EncodeError>;
+}
+
+pub trait Decodeable {
+    fn decode<R: AsyncRead + Unpin + Send>(reader: &mut R) -> Result<Self, DecodeError>
+    where
+        Self: Sized;
+}
+
 impl Byteable for () {
     async fn encode<W: AsyncWrite + Unpin + Send>(
         &self,
@@ -182,11 +194,29 @@ impl<T: Byteable, E: Byteable> Byteable for Result<T, E> {
     }
 }
 
+impl Encodeable for str {
+    async fn encode<W: AsyncWrite + Unpin + Send>(
+        &self,
+        writer: &mut W,
+    ) -> Result<(), EncodeError> {
+        if self.len() > u16::MAX as usize {
+            return Err(EncodeError::TooManyElements {
+                allowed: u16::MAX as usize,
+                actual: self.len(),
+            });
+        }
+        writer.write_u16(self.len() as u16).await?;
+        writer.write(self.as_bytes()).await?;
+        Ok(())
+    }
+}
+
 impl Byteable for String {
     async fn encode<W: AsyncWrite + Unpin + Send>(
         &self,
         writer: &mut W,
     ) -> Result<(), EncodeError> {
+        //self.as_str().encode(writer).await
         if self.len() > u16::MAX as usize {
             return Err(EncodeError::TooManyElements {
                 allowed: u16::MAX as usize,
@@ -261,5 +291,19 @@ impl Byteable for i32 {
 
     async fn decode<R: AsyncRead + Unpin + Send>(reader: &mut R) -> Result<Self, DecodeError> {
         Ok(reader.read_i32().await?)
+    }
+}
+
+impl Byteable for i64 {
+    async fn encode<W: AsyncWrite + Unpin + Send>(
+        &self,
+        writer: &mut W,
+    ) -> Result<(), EncodeError> {
+        writer.write_i64(*self).await?;
+        Ok(())
+    }
+
+    async fn decode<R: AsyncRead + Unpin + Send>(reader: &mut R) -> Result<Self, DecodeError> {
+        Ok(reader.read_i64().await?)
     }
 }

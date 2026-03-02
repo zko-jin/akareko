@@ -16,6 +16,18 @@ pub struct KeyPair {
     //todo: custom serialize to remove public_key
     public_key: PublicKey,
 }
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SchedulerConfig {
+    pub full_sync_interval: u64,
+}
+
+impl Default for SchedulerConfig {
+    fn default() -> Self {
+        Self {
+            full_sync_interval: 60 * 5, // 5 minutes
+        }
+    }
+}
 
 impl KeyPair {
     pub fn new(private_key: PrivateKey) -> Self {
@@ -30,7 +42,7 @@ impl KeyPair {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(default)]
-pub struct AuroraConfig {
+pub struct AkarekoConfig {
     #[serde(flatten)]
     keypair: KeyPair,
 
@@ -42,6 +54,9 @@ pub struct AuroraConfig {
     dev_mode: bool,
 
     image_viewer_preferences: ImageViewerPreferences,
+
+    max_client_connections: u16,
+    scheduler_config: SchedulerConfig,
 
     is_relay: bool,
 }
@@ -85,7 +100,7 @@ impl Default for ImageViewerPreferences {
     }
 }
 
-impl Default for AuroraConfig {
+impl Default for AkarekoConfig {
     fn default() -> Self {
         Self {
             keypair: KeyPair::new(PrivateKey::new()),
@@ -94,12 +109,14 @@ impl Default for AuroraConfig {
             eepsite_address: I2PAddress::new(""),
             dev_mode: false,
             is_relay: false,
+            max_client_connections: 8,
+            scheduler_config: SchedulerConfig::default(),
             image_viewer_preferences: ImageViewerPreferences::default(),
         }
     }
 }
 
-impl AuroraConfig {
+impl AkarekoConfig {
     pub async fn save(&self) -> Result<(), TomlSaveError> {
         let config = toml::to_string(self)?;
         fs::write("config.toml", config).await?;
@@ -113,7 +130,7 @@ impl AuroraConfig {
 
     /// can't fail, if the config is missing or is invalid it will just be created
     /// anyways
-    pub async fn load() -> AuroraConfig {
+    pub async fn load() -> AkarekoConfig {
         let mut should_save = false;
 
         let mut config = match fs::read_to_string("config.toml").await {
@@ -121,13 +138,13 @@ impl AuroraConfig {
                 Ok(config) => config,
                 Err(e) => {
                     error!("error loading config: {}", e);
-                    AuroraConfig::default()
+                    AkarekoConfig::default()
                 }
             },
             Err(e) => {
                 warn!("error opening config file: {}", e);
                 should_save = true;
-                AuroraConfig::default()
+                AkarekoConfig::default()
             }
         };
 
@@ -157,6 +174,10 @@ impl AuroraConfig {
         &self.eepsite_address
     }
 
+    pub fn scheduler_config(&self) -> &SchedulerConfig {
+        &self.scheduler_config
+    }
+
     pub fn sam_port(&self) -> u16 {
         self.sam_port
     }
@@ -167,6 +188,10 @@ impl AuroraConfig {
 
     pub fn private_key(&self) -> &PrivateKey {
         &self.keypair.private_key
+    }
+
+    pub fn max_client_connections(&self) -> u16 {
+        self.max_client_connections
     }
 
     pub fn dev_mode(&self) -> bool {

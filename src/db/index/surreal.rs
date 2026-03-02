@@ -1,16 +1,19 @@
 use const_format::formatcp;
 use fastbloom::BloomFilter;
 use surrealdb::{Surreal, engine::local::Db, types::RecordId};
-use surrealdb_types::Value;
+use surrealdb_types::{RecordIdKey, SurrealValue, Value};
 use tracing::info;
 
 use crate::{
     db::{
-        Content, Timestamp,
-        index::{Index, IndexTag},
+        BLOOM_FILTER_FALSE_POSITIVE_RATE, Content, Timestamp,
+        comments::Topic,
+        event::{Event, EventType, insert_event},
+        index::{Index, IndexTag, tags::MangaTag},
     },
     errors::DatabaseError,
-    hash::{Hash, PublicKey},
+    hash::{Hash, PublicKey, Signature},
+    helpers::now_timestamp,
 };
 
 // ==================== End Imports ====================
@@ -27,34 +30,57 @@ impl<'a> IndexRepository<'a> {
 
 impl<'a> IndexRepository<'a> {
     pub async fn add_index<T: IndexTag>(&self, index: Index<T>) -> Result<Index<T>, DatabaseError> {
-        let created: Vec<Index<T>> = self.db.upsert(T::TAG).content(index).await?;
+        let transaction = self.db.clone().begin().await?;
 
-        match created.len() {
-            1 => Ok(created.into_iter().next().unwrap()),
-            _ => Err(DatabaseError::Unknown),
-        }
+        let timestamp = now_timestamp();
+
+        let event = Event {
+            timestamp,
+            event_type: T::EVENT_TYPE,
+            topic: Topic::from_index(&index),
+        };
+
+        insert_event(vec![event], &transaction).await?;
+
+        let created: Vec<Index<T>> = transaction.upsert(T::TAG).content(index).await?;
+
+        let r = match created.len() {
+            1 => created.into_iter().next().unwrap(),
+            _ => return Err(DatabaseError::Unknown),
+        };
+
+        transaction.commit().await?;
+
+        Ok(r)
     }
 
     pub async fn add_content<T: IndexTag + 'static>(
         &self,
         content: Content<T>,
     ) -> Result<Content<T>, DatabaseError> {
-        let created: Result<Option<Content<T>>, surrealdb::Error> = self
-            .db
+        let transaction = self.db.clone().begin().await?;
+
+        let timestamp = now_timestamp();
+
+        let event = Event {
+            timestamp,
+            event_type: T::CONTENT_EVENT_TYPE,
+            topic: Topic::from_content(&content),
+        };
+
+        insert_event(vec![event], &transaction).await?;
+
+        let created: Option<Content<T>> = transaction
             .upsert((T::CONTENT_TABLE, content.signature().as_base64()))
             .content(content)
-            .await;
+            .await?;
 
-        match created {
-            Ok(n) => match n {
-                Some(n) => Ok(n),
-                None => Err(DatabaseError::Unknown),
-            },
-            Err(e) => {
-                info!("Error: {}", e);
-                Err(DatabaseError::Unknown)
-            }
-        }
+        let r = match created {
+            Some(n) => n,
+            None => return Err(DatabaseError::Unknown),
+        };
+
+        Ok(r)
     }
 
     pub async fn get_all_indexes<T: IndexTag>(
@@ -109,6 +135,25 @@ impl<'a> IndexRepository<'a> {
         Ok(results)
     }
 
+    pub async fn get_contents<T: IndexTag>(
+        &self,
+        signatures: &[Signature],
+    ) -> Result<Vec<Content<T>>, DatabaseError> {
+        let ids: Vec<RecordId> = signatures
+            .iter()
+            .map(|s| RecordId::new(T::CONTENT_TABLE, s.as_base64()))
+            .collect();
+
+        let results: Vec<Content<T>> = self
+            .db
+            .query("SELECT * FROM $ids")
+            .bind(("ids", ids))
+            .await?
+            .take(0)?;
+
+        Ok(results)
+    }
+
     pub async fn get_index<T: IndexTag>(
         &self,
         hash: &Hash,
@@ -117,21 +162,69 @@ impl<'a> IndexRepository<'a> {
         Ok(result)
     }
 
-    pub async fn get_contents<T: IndexTag>(&self, index_hash: Hash) -> Vec<Content<T>> {
+    pub async fn get_filtered_index_contents<T: IndexTag>(
+        &self,
+        index_hash: Hash,
+        timestamp: Timestamp,
+        filter: Option<BloomFilter>,
+    ) -> Result<Vec<Content<T>>, DatabaseError> {
         let query: String = format!(
-            "SELECT * FROM {} WHERE index_hash = $index_hash",
-            T::CONTENT_TABLE
+            "SELECT * FROM {} WHERE index_hash = $index_hash {};",
+            T::CONTENT_TABLE,
+            if timestamp != 0 {
+                "WHERE timestamp >= $timestamp"
+            } else {
+                ""
+            }
         );
 
-        let chapters: Vec<Content<T>> = self
+        let results: Vec<Content<T>> = self
             .db
             .query(query)
             .bind(("index_hash", index_hash))
-            .await
-            .unwrap()
-            .take(0)
-            .unwrap();
+            .await?
+            .take(0)?;
 
-        chapters
+        let contents = match filter {
+            Some(filter) => results
+                .into_iter()
+                .filter(|c| !filter.contains(c))
+                .collect(),
+            None => results,
+        };
+
+        Ok(contents)
+    }
+
+    pub async fn make_filter<T: IndexTag>(
+        &self,
+        index_hash: &Hash,
+        timestamp: u64,
+    ) -> Result<BloomFilter, DatabaseError> {
+        let query: String = format!(
+            "
+                SELECT * FROM {0} WHERE index_hash = $index_hash {1};
+            ",
+            T::CONTENT_TABLE,
+            if timestamp != 0 {
+                " AND timestamp >= $timestamp"
+            } else {
+                ""
+            }
+        );
+
+        let result: Vec<Content<T>> = self
+            .db
+            .query(query)
+            .bind(("index_hash", index_hash.as_base64()))
+            .bind(("timestamp", timestamp))
+            .await?
+            .take(0)?;
+
+        let mut filter = BloomFilter::with_false_pos(BLOOM_FILTER_FALSE_POSITIVE_RATE)
+            .expected_items(result.len());
+        filter.insert(&result);
+
+        Ok(filter)
     }
 }

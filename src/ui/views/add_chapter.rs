@@ -15,7 +15,7 @@ use crate::{
     helpers::{Language, now_timestamp},
     ui::{
         AppState, Message,
-        views::{View, ViewMessage, novel::NovelView},
+        views::{View, ViewMessage, novel::MangaView},
     },
 };
 
@@ -121,7 +121,7 @@ impl AddMangaChapterView {
                                 title: e.title.clone(),
                                 enumeration: e.enumeration,
                                 path: e.path.clone(),
-                                content: MangaChapter::new(Language::English),
+                                extra_metadata: MangaChapter::new(Language::English),
                                 progress: 0.0,
                             })
                             .collect();
@@ -137,7 +137,7 @@ impl AddMangaChapterView {
 
                         let repositories = repositories.clone();
                         return Task::future(async move {
-                            match repositories.index().await.add_content(chapter).await {
+                            match repositories.index().add_content(chapter).await {
                                 Ok(_) => {}
                                 Err(e) => {
                                     println!("Error adding chapter: {}", e);
@@ -168,7 +168,7 @@ impl AddMangaChapterView {
                 AddMangaChapterMessage::SavedContent => {
                     v.entries = vec![];
                     v.magnet = String::new();
-                    return Task::done(Message::ChangeView(View::Novel(NovelView::new(
+                    return Task::done(Message::ChangeView(View::Novel(MangaView::new(
                         v.novel.clone(),
                     ))));
                 }

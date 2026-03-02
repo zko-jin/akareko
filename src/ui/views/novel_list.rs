@@ -5,33 +5,36 @@ use iced::{
 use tracing::error;
 
 use crate::{
-    db::index::{Index, tags::MangaTag},
+    db::{
+        follow_index::IndexFollow,
+        index::{Index, tags::MangaTag},
+    },
     ui::{
         AppState, Message,
         components::toast::Toast,
-        views::{View, ViewMessage, add_novel::AddNovelView, novel::NovelView},
+        views::{View, ViewMessage, add_novel::AddNovelView, novel::MangaView},
     },
 };
 
 #[derive(Debug, Clone)]
 pub struct MangaListView {
-    novels: Vec<Index<MangaTag>>,
+    mangas: Vec<Index<MangaTag>>,
 }
 
 #[derive(Debug, Clone)]
-pub enum NovelListMessage {
-    LoadedNovels(Vec<Index<MangaTag>>),
+pub enum MangaListMessage {
+    LoadedMangas(Vec<Index<MangaTag>>),
 }
 
-impl From<NovelListMessage> for Message {
-    fn from(msg: NovelListMessage) -> Message {
+impl From<MangaListMessage> for Message {
+    fn from(msg: MangaListMessage) -> Message {
         Message::ViewMessage(ViewMessage::NovelList(msg))
     }
 }
 
 impl MangaListView {
     pub fn new() -> Self {
-        Self { novels: vec![] }
+        Self { mangas: vec![] }
     }
 
     pub fn subscription(&self) -> iced::Subscription<Message> {
@@ -43,7 +46,7 @@ impl MangaListView {
             let repositories = repositories.clone();
 
             return Task::future(async move {
-                let novels = match repositories.index().await.get_all_indexes(0, None).await {
+                let novels = match repositories.index().get_all_indexes(0, None).await {
                     Ok(novels) => novels,
                     Err(e) => {
                         error!("Failed to get all indexes: {}", e);
@@ -53,27 +56,27 @@ impl MangaListView {
                         ));
                     }
                 };
-                NovelListMessage::LoadedNovels(novels).into()
+                MangaListMessage::LoadedMangas(novels).into()
             });
         }
         Task::none()
     }
 
     pub fn view(&self, state: &AppState) -> iced::Element<'_, Message> {
-        let mut column: Vec<iced::Element<Message>> = vec![text("Novels").into()];
+        let mut column: Vec<iced::Element<Message>> = vec![text("Mangas").into()];
 
         if state.config.dev_mode() {
             column.push(
-                button(text("Add Novel"))
+                button(text("Add Manga"))
                     .on_press(Message::ChangeView(View::AddNovel(AddNovelView::new())))
                     .into(),
             );
         }
 
-        for novel in self.novels.iter() {
+        for novel in self.mangas.iter() {
             column.push(
                 button(text(novel.title().clone()))
-                    .on_press(Message::ChangeView(View::Novel(NovelView::new(
+                    .on_press(Message::ChangeView(View::Novel(MangaView::new(
                         novel.clone(),
                     ))))
                     .into(),
@@ -83,11 +86,11 @@ impl MangaListView {
         Column::from_vec(column).into()
     }
 
-    pub fn update(m: NovelListMessage, state: &mut AppState) -> Task<Message> {
+    pub fn update(m: MangaListMessage, state: &mut AppState) -> Task<Message> {
         if let View::NovelList(v) = &mut state.view {
             match m {
-                NovelListMessage::LoadedNovels(novels) => {
-                    v.novels = novels;
+                MangaListMessage::LoadedMangas(novels) => {
+                    v.mangas = novels;
                 }
             }
         }

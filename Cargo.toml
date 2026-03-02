@@ -1,5 +1,5 @@
 [package]
-name = "aurora"
+name = "akareko"
 version = "0.1.0"
 edition = "2024"
 
@@ -18,9 +18,10 @@ serde_json = "1.0.141"
 toml = "0.9.2"
 url = "2.5.4"
 
-surrealdb = { version = "3.0.1", features = ["kv-surrealkv"] }
+surrealdb = { version = "3.0.1", features = ["kv-surrealkv", "kv-mem"] }
 surrealdb-types = "3.0.1"
 surrealdb-core = "3.0.1"
+
 
 async-trait = "0.1.89"
 ed25519-dalek = { version = "2.2.0", features = ["rand_core"] }
@@ -38,7 +39,7 @@ base64 = "0.22.1"
 zeroize = { version = "1.8.1", features = ["zeroize_derive"] }
 
 dirs = "6.0.0"
-futures = "0.3.31"
+futures = { version = "0.3.31", features = [] }
 
 tokio-util = { version = "0.7.16", features = ["compat", "io", "io-util"] }
 
@@ -50,10 +51,9 @@ paste = "1.0.15"
 byteable-derive = { path = "./byteable-derive" }
 cxx = "1.0.186"
 bitflags = "2.9.4"
-anawt = { git = "https://github.com/pliduino/anawt.git", branch = "develop" }
-iced = { version = "0.14.0", features = ["tokio", "image", "svg", "sipper"] }
-iced_aw = "0.13.0"
-# zip = "5.1.1"
+anawt = { git = "https://github.com/pliduino/anawt.git", branch = "develop", optional = true }
+iced = { version = "0.14.0", features = ["tokio", "image", "svg", "sipper"], optional = true }
+iced_aw = { version = "0.13.0", optional = true }
 bytes = "1.10.1"
 error_set = "0.9.0"
 rclite = "0.3.0"
@@ -64,15 +64,27 @@ image = "0.25.9"
 async_zip = { version = "0.0.18", features = ["tokio", "tokio-fs", "zstd", "lzma", "xz", "bzip2", "deflate"]}
 serde_bytes = "0.11.19"
 xorf = "0.12.0"
-fastbloom = "0.15.0"
+fastbloom = { version = "0.16.0", features = ["serde"] }
 num_enum = "0.7.5"
+strum = "0.28.0"
+strum_macros = "0.28.0"
+# diesel = { version = "2.3.6", features = ["sqlite"] }
+# diesel-async = { version = "0.7.4", features = ["sqlite", "bb8", "migrations"] }
 
+[dev-dependencies]
+criterion = { version = "0.5.1", features = ["async_tokio"] }
+
+[[bench]]
+name = "db_benchmark"
+harness = false
 
 [features]
-default = ["surrealdb"]
+default = ["surrealdb", "bin"]
+bin = ["dep:iced", "dep:iced_aw", "dep:anawt"]
 lto = ["anawt/lto"]
 surrealdb = []
-sqlite = []
+sqlite = ["diesel"]
+diesel = []
 
 [profile.release]
 lto = "fat"
@@ -81,3 +93,12 @@ opt-level = 3
 panic = "abort"
 codegen-units = 1
 features = ["lto"]
+
+[lib]
+name = "akareko_lib"
+path = "src/lib.rs"
+
+[[bin]]
+name = "akareko"
+path = "src/main.rs"
+required-features = ["bin"]

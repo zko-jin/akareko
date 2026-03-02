@@ -2,17 +2,20 @@ use std::collections::HashSet;
 
 use const_format::formatcp;
 use fastbloom::BloomFilter;
-use surrealdb::{Surreal, engine::local::Db};
-use surrealdb_types::SurrealValue;
+use surrealdb::{Surreal, engine::local::Db, method::Transaction};
+use surrealdb_types::{RecordId, SurrealValue};
 use tracing::info;
 
 use crate::{
     db::{
-        PaginateResponse,
+        BLOOM_FILTER_FALSE_POSITIVE_RATE, PaginateResponse,
         comments::{Post, Topic},
+        event::{Event, EventType, insert_event},
         user::User,
     },
     errors::DatabaseError,
+    hash::Signature,
+    helpers::now_timestamp,
 };
 
 pub struct PostRepository<'a> {
@@ -27,19 +30,32 @@ impl<'a> PostRepository<'a> {
 
 impl<'a> PostRepository<'a> {
     pub async fn add_comment(&self, post: Post) -> Result<Post, DatabaseError> {
-        let result: Option<Post> = self
-            .db
+        let transaction = self.db.clone().begin().await?;
+
+        let timestamp = now_timestamp();
+
+        let event = Event {
+            timestamp,
+            event_type: EventType::Post,
+            topic: Topic::from_post(&post),
+        };
+
+        insert_event(vec![event], &transaction).await?;
+
+        let result: Option<Post> = transaction
             .create((Post::TABLE_NAME, post.signature.as_base64()))
             .content(post)
             .await?;
 
-        match result {
-            Some(post) => {
-                info!("Created post: {}", post.signature.as_base64());
-                Ok(post)
-            }
-            None => Err(DatabaseError::Unknown),
-        }
+        let post = match result {
+            Some(post) => post,
+            None => return Err(DatabaseError::Unknown),
+        };
+
+        transaction.commit().await?;
+        info!("Created post: {}", post.signature.as_base64());
+
+        Ok(post)
     }
 
     pub async fn get_posts_by_topic(
@@ -48,7 +64,7 @@ impl<'a> PostRepository<'a> {
         take: usize,
         skip: usize,
     ) -> Result<PaginateResponse<(Vec<Post>, HashSet<User>)>, DatabaseError> {
-        const QUERY: &'static str = formatcp!(
+        const QUERY: &str = formatcp!(
             "
             LET $rows = (
                 SELECT *
@@ -130,13 +146,38 @@ impl<'a> PostRepository<'a> {
             .await?
             .take(0)?;
 
-        let mut filter = BloomFilter::with_false_pos(0.0001).expected_items(result.len());
+        let mut filter = BloomFilter::with_false_pos(BLOOM_FILTER_FALSE_POSITIVE_RATE)
+            .expected_items(result.len());
         filter.insert(&result);
 
         Ok(filter)
     }
 
-    pub async fn get_all_posts_by_topic(
+    pub async fn get_posts(&self, signatures: &[Signature]) -> Result<Vec<Post>, DatabaseError> {
+        let ids: Vec<RecordId> = signatures
+            .iter()
+            .map(|s| RecordId::new(Post::TABLE_NAME, s.as_base64()))
+            .collect();
+
+        let mut results = vec![];
+        for id in ids.iter() {
+            let result = self.db.select(id).await?;
+            if let Some(post) = result {
+                results.push(post);
+            }
+        }
+
+        // let results: Vec<Post> = self
+        //     .db
+        //     .query("SELECT * FROM $ids")
+        //     .bind(("ids", ids))
+        //     .await?
+        //     .take(0)?;
+
+        Ok(results)
+    }
+
+    pub async fn get_filtered_posts_by_topic(
         &self,
         topic: Topic,
         timestamp: u64,

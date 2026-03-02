@@ -1,37 +1,96 @@
+use fastbloom::BloomFilter;
 use rclite::Arc;
-use tokio::sync::Mutex;
+use tokio::sync::{Mutex, RwLock};
 use tracing::{error, info};
 use yosemite::{Session, SessionOptions, Stream, style};
 
 use crate::{
-    config::AuroraConfig,
+    config::AkarekoConfig,
     db::{
-        Repositories,
-        index::{Index, IndexRepository, tags::IndexTag},
+        Repositories, Timestamp,
+        comments::Post,
+        event::{EventType, make_event_filter},
+        index::{
+            Index, IndexRepository,
+            content::Content,
+            tags::{IndexTag, MangaTag},
+        },
         user::{I2PAddress, TrustLevel, User},
     },
     errors::ClientError,
-    hash::PublicKey,
+    hash::{Hash, PublicKey},
     server::{
         handler::{
-            self, AuroraProtocolCommand,
-            index::GetAllIndexesRequest,
+            self, AkarekoProtocolCommand, AkarekoProtocolCommandRequest,
+            events::SyncEventsRequest,
+            index::{GetAllIndexesRequest, GetContents, GetContentsRequest},
             users::{get_users::GetUsersRequest, who::WhoRequest},
         },
+        protocol::StreamDecode,
         proxy::LoggingStream, // proxy::I2PConnector,
     },
 };
 
+pub const TIME_OFFSET: u64 = 60;
+
+pub mod pool;
+
 #[derive(Clone)]
-pub struct AuroraClient {
-    repositories: Repositories,
+pub struct AkarekoClient {
     host_address: I2PAddress,
     session: Arc<Mutex<Session<style::Stream>>>,
 }
 
-impl AuroraClient {
-    pub async fn new(repositories: Repositories, config: AuroraConfig) -> Self {
-        info!("Initializing AuroraClient...");
+macro_rules! impl_get_content {
+    ($tag:ty, $id:ident) => {
+        paste::paste! {
+            pub async fn [<get_ $id _content>](
+                &mut self,
+                url: &I2PAddress,
+                db: IndexRepository<'_>,
+                index_hash: Hash,
+                timestamp: Timestamp,
+                filter: Option<BloomFilter>,
+            ) -> Result<(), ClientError> {
+                let mut stream = self.get_stream(url).await?;
+
+                let mut res = GetContents::<$tag>::request(
+                    GetContentsRequest::new(index_hash, timestamp, filter),
+                    &mut stream,
+                )
+                .await?;
+
+                if !res.status().is_ok() {
+                    return Err(ClientError::UnexpectedResponseCode {
+                        status: res.status().clone(),
+                    });
+                }
+
+                while let Ok(Some(content)) = res.data().next(&mut stream).await {
+                    if !content.verify() {
+                        error!("Invalid content signature");
+                        continue;
+                    }
+
+                    match db.add_content(content).await {
+                        Ok(_) => {}
+                        Err(e) => {
+                            error!("Failed to add content: {}", e);
+                        }
+                    }
+                }
+
+                Ok(())
+            }
+        }
+    };
+}
+
+impl AkarekoClient {
+    impl_get_content!(MangaTag, manga);
+
+    pub async fn new(config: AkarekoConfig) -> Self {
+        info!("Initializing AkarekoClient...");
 
         let session = Arc::new(Mutex::new(
             Session::<style::Stream>::new(SessionOptions {
@@ -46,10 +105,9 @@ impl AuroraClient {
             .unwrap(),
         ));
 
-        info!("Initialized AuroraClient");
+        info!("Initialized AkarekoClient");
 
         Self {
-            repositories,
             session,
             host_address: config.eepsite_address().clone(),
         }
@@ -64,19 +122,110 @@ impl AuroraClient {
         Ok(stream)
     }
 
+    pub async fn sync_events(
+        &mut self,
+        url: &I2PAddress,
+        timestamp: Timestamp,
+        repo: &Repositories,
+    ) -> Result<Timestamp, ClientError> {
+        let mut stream = self.get_stream(url).await?;
+
+        let filter = make_event_filter(
+            if timestamp > TIME_OFFSET {
+                timestamp - TIME_OFFSET
+            } else {
+                0
+            },
+            &repo.db,
+        )
+        .await?;
+
+        let res = handler::events::SyncEvents::request(
+            SyncEventsRequest {
+                timestamp,
+                filter: Some(filter),
+            },
+            &mut stream,
+        )
+        .await?;
+
+        if !res.status().is_ok() {
+            return Err(ClientError::UnexpectedResponseCode {
+                status: res.status().clone(),
+            });
+        }
+
+        let Some(payload) = res.payload() else {
+            return Err(ClientError::MissingPayload);
+        };
+
+        for (event_type, len) in payload.decode_streams {
+            match event_type {
+                EventType::Invalid => {
+                    // It would return an error earlier when decoding
+                    unreachable!()
+                }
+                EventType::User => {
+                    let mut stream_decode = StreamDecode::<User>::new_receiver(len);
+                    while let Some(user) = stream_decode.next(&mut stream).await? {
+                        if !user.verify() {
+                            error!("Invalid user signature");
+                            continue;
+                        }
+                        repo.user().upsert_user(user).await?;
+                    }
+                }
+                EventType::Manga => {
+                    let mut stream_decode = StreamDecode::<Index<MangaTag>>::new_receiver(len);
+                    while let Some(index) = stream_decode.next(&mut stream).await? {
+                        if !index.verify() {
+                            error!("Invalid index signature");
+                            continue;
+                        }
+                        repo.index().add_index(index).await?;
+                    }
+                }
+                EventType::MangaContent => {
+                    let mut stream_decode = StreamDecode::<Content<MangaTag>>::new_receiver(len);
+                    while let Some(content) = stream_decode.next(&mut stream).await? {
+                        if !content.verify() {
+                            error!("Invalid content signature");
+                            continue;
+                        }
+                        repo.index().add_content(content).await?;
+                    }
+                }
+                EventType::Post => {
+                    let mut stream_decode = StreamDecode::<Post>::new_receiver(len);
+                    while let Some(post) = stream_decode.next(&mut stream).await? {
+                        if !post.verify() {
+                            error!("Invalid post signature");
+                            continue;
+                        }
+                        repo.posts().add_comment(post).await?;
+                    }
+                }
+            }
+        }
+
+        Ok(payload.timestamp)
+    }
+
     // ╔===========================================================================╗
     // ║                                   Index                                   ║
     // ╚===========================================================================╝
 
-    pub async fn get_all_indexes<T: IndexTag>(
+    pub async fn get_indexes<T: IndexTag>(
         &mut self,
         url: &I2PAddress,
         db: IndexRepository<'_>,
+        timestamp: Timestamp,
+        filter: Option<BloomFilter>,
     ) -> Result<(), ClientError> {
         let mut stream = self.get_stream(url).await?;
 
         let mut res = handler::index::GetAllIndexes::request(
-            GetAllIndexesRequest::new::<T>(0, None),
+            GetAllIndexesRequest::new::<T>(timestamp, filter),
             &mut stream,
         )
         .await?;
@@ -232,7 +381,7 @@ impl AuroraClient {
             return Err(ClientError::InvalidSignature);
         }
 
-        let mut user = payload.user.as_user();
+        let mut user = payload.user;
         if !user.verify() {
             return Err(ClientError::InvalidSignature);
         }
@@ -267,7 +416,7 @@ impl AuroraClient {
             return Err(ClientError::MissingPayload);
         };
 
-        let users: Vec<User> = payload.users.into_iter().map(|u| u.as_user()).collect();
+        let users: Vec<User> = payload.users;
 
         // TODO
         // self.repositories
@@ -279,8 +428,8 @@ impl AuroraClient {
     }
 }
 
-impl std::fmt::Debug for AuroraClient {
+impl std::fmt::Debug for AkarekoClient {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_struct("AuroraClient").finish()
+        f.debug_struct("AkarekoClient").finish()
     }
 }

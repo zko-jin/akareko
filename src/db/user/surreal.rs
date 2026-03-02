@@ -1,13 +1,45 @@
 use rand::seq::IteratorRandom;
 use surrealdb::{Surreal, engine::local::Db, types::RecordId};
+use surrealdb_types::{SurrealValue, Value};
 use tracing::info;
 
-use crate::{db::user::TrustLevel, errors::DatabaseError, hash::PublicKey};
+use crate::{
+    db::{
+        comments::Topic,
+        event::{Event, EventType, insert_event},
+        user::TrustLevel,
+    },
+    errors::DatabaseError,
+    hash::PublicKey,
+    helpers::now_timestamp,
+};
 
 use super::User;
 
 pub struct UserRepository<'a> {
     db: &'a Surreal<Db>,
+}
+
+impl SurrealValue for TrustLevel {
+    fn kind_of() -> surrealdb_types::Kind {
+        surrealdb_types::Kind::Number
+    }
+
+    fn into_value(self) -> surrealdb_types::Value {
+        (self as u8).into_value()
+    }
+
+    fn from_value(value: surrealdb_types::Value) -> Result<Self, surrealdb::Error>
+    where
+        Self: Sized,
+    {
+        let value = u8::from_value(value)?;
+        value
+            .try_into()
+            .map_err(|e: num_enum::TryFromPrimitiveError<TrustLevel>| {
+                surrealdb::Error::internal(e.to_string())
+            })
+    }
 }
 
 impl<'a> UserRepository<'a> {
@@ -17,16 +49,47 @@ impl<'a> UserRepository<'a> {
 }
 
 impl<'a> UserRepository<'a> {
-    pub async fn upsert_user(&self, user: User) -> Result<User, DatabaseError> {
-        let result: Vec<User> = self.db.upsert(User::TABLE_NAME).content(user).await?;
+    pub async fn upsert_user(&self, user: User) -> Result<(), DatabaseError> {
+        let transaction = self.db.clone().begin().await?;
 
-        match result.into_iter().next() {
-            Some(user) => {
-                info!("Created user: {}", user.name());
-                Ok(user)
-            }
-            None => Err(DatabaseError::Unknown),
-        }
+        let timestamp = now_timestamp();
+
+        let event = Event {
+            timestamp,
+            event_type: EventType::User,
+            topic: Topic::from_user(&user),
+        };
+
+        insert_event(vec![event], &transaction).await?;
+
+        let _: Vec<Value> = transaction.upsert(User::TABLE_NAME).content(user).await?;
+
+        transaction.commit().await?;
+
+        Ok(())
+    }
+
+    pub async fn upsert_users(&self, users: Vec<User>) -> Result<(), DatabaseError> {
+        let transaction = self.db.clone().begin().await?;
+
+        let timestamp = now_timestamp();
+
+        let events = users
+            .iter()
+            .map(|u| Event {
+                timestamp,
+                event_type: EventType::User,
+                topic: Topic::from_user(u),
+            })
+            .collect();
+
+        insert_event(events, &transaction).await?;
+
+        let _: Vec<Value> = transaction.upsert(User::TABLE_NAME).content(users).await?;
+
+        transaction.commit().await?;
+
+        Ok(())
     }
 
     pub async fn get_users_b64(
@@ -54,12 +117,20 @@ impl<'a> UserRepository<'a> {
             .map(|p| RecordId::new(User::TABLE_NAME, p.to_base64()))
             .collect();
 
-        let results: Vec<User> = self
-            .db
-            .query("SELECT * FROM $ids")
-            .bind(("ids", ids))
-            .await?
-            .take(0)?;
+        let mut results: Vec<User> = vec![];
+        for id in ids.iter() {
+            let result = self.db.select(id).await?;
+            if let Some(user) = result {
+                results.push(user);
+            }
+        }
+
+        // let results: Vec<User> = self
+        //     .db
+        //     .query("SELECT * FROM $ids")
+        //     .bind(("ids", ids))
+        //     .await?
+        //     .take(0)?;
 
         Ok(results)
     }

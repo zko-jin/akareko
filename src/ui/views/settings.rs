@@ -5,7 +5,7 @@ use iced::{
 use tracing::info;
 
 use crate::{
-    config::AuroraConfig,
+    config::AkarekoConfig,
     db::user::{TrustLevel, User},
     helpers::now_timestamp,
     ui::{
@@ -17,7 +17,7 @@ use crate::{
 
 #[derive(Debug, Clone)]
 pub struct SettingsView {
-    config: AuroraConfig,
+    config: AkarekoConfig,
     old_name: String,
     new_name: String,
     dirty: bool,
@@ -28,7 +28,7 @@ pub enum SettingsMessage {
     UpdateRelay(bool),
     UpdatedDevMode(bool),
     SaveConfig,
-    SavedConfig(AuroraConfig),
+    SavedConfig(AkarekoConfig),
     UpdateName(String),
     PublishName,
 }
@@ -42,7 +42,7 @@ impl From<SettingsMessage> for Message {
 impl SettingsView {
     pub fn new() -> Self {
         Self {
-            config: AuroraConfig::default(),
+            config: AkarekoConfig::default(),
             old_name: String::new(),
             new_name: String::new(),
             dirty: false,
@@ -136,7 +136,7 @@ impl SettingsView {
                         new_user.set_trust(TrustLevel::Ignore);
 
                         return Task::future(async move {
-                            match repositories.user().await.upsert_user(new_user).await {
+                            match repositories.user().upsert_user(new_user).await {
                                 Ok(_) => Message::PostToast(Toast {
                                     title: "Username published".into(),
                                     body: "Your username has been published to the network".into(),

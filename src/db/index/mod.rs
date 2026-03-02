@@ -1,5 +1,6 @@
 use surrealdb_types::SurrealValue;
 use tokio::io::{AsyncRead, AsyncWrite};
+use tracing::trace;
 
 use crate::{
     db::{SurrealPhantom, Timestamp, index::tags::IndexTag},
@@ -22,15 +23,16 @@ mod surreal;
 #[cfg(feature = "surrealdb")]
 pub use surreal::IndexRepository;
 
-#[derive(Debug, Clone, SurrealValue)]
+#[derive(Debug, Clone, byteable_derive::Byteable)]
+#[cfg_attr(feature = "surrealdb", derive(SurrealValue))]
 pub struct Index<T: IndexTag> {
+    #[cfg_attr(feature = "surrealdb", surreal(rename = "id"))]
     hash: Hash, // Primary Key
     title: String,
     release_date: i32,
     source: PublicKey,
-    received_at: Timestamp,
     signature: Signature,
-    #[surreal(skip, default)]
+    #[byteable(skip)]
     _phantom: SurrealPhantom<T>,
 }
 
@@ -50,7 +52,6 @@ impl<T: IndexTag> Index<T> {
             release_date,
             source,
             signature,
-            received_at: now_timestamp(), // Indexes created by the user
             _phantom: SurrealPhantom::default(),
         }
     }
@@ -110,31 +111,5 @@ impl<T: IndexTag> Index<T> {
 
     pub fn signature(&self) -> &Signature {
         &self.signature
-    }
-}
-
-impl<T: IndexTag> Byteable for Index<T> {
-    async fn encode<W: AsyncWrite + Unpin + Send>(
-        &self,
-        writer: &mut W,
-    ) -> Result<(), EncodeError> {
-        self.hash.encode(writer).await?;
-        self.title.encode(writer).await?;
-        self.release_date.encode(writer).await?;
-        self.source.encode(writer).await?;
-        self.signature.encode(writer).await?;
-        Ok(())
-    }
-
-    async fn decode<R: AsyncRead + Unpin + Send>(reader: &mut R) -> Result<Self, DecodeError> {
-        Ok(Index {
-            hash: Hash::decode(reader).await?,
-            title: String::decode(reader).await?,
-            release_date: i32::decode(reader).await?,
-            source: PublicKey::decode(reader).await?,
-            signature: Signature::decode(reader).await?,
-            received_at: now_timestamp(),
-            _phantom: SurrealPhantom::default(),
-        })
     }
 }

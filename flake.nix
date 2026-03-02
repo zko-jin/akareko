@@ -1,5 +1,5 @@
 {
-  description = "Aurora Development Shell";
+  description = "Akareko Development Shell";
 
   inputs = {
     nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
@@ -41,6 +41,7 @@
 
             boost
             boost-build
+            diesel-cli
           ];
 
           buildInputs = with pkgs; [
