@@ -10,8 +10,9 @@ use crate::{
         index::{Index, tags::MangaTag},
     },
     ui::{
-        AppState, Message,
+        AppState,
         components::toast::Toast,
+        message::Message,
         views::{View, ViewMessage, add_novel::AddNovelView, novel::MangaView},
     },
 };

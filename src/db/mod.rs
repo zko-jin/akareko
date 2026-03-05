@@ -1,14 +1,11 @@
-use std::fmt::Debug;
 #[cfg(feature = "surrealdb")]
-use std::path::Path;
-
 #[cfg(feature = "diesel")]
 use diesel::SqliteConnection;
 #[cfg(feature = "diesel")]
 use diesel_async::pooled_connection::{AsyncDieselConnectionManager, bb8::Pool};
 #[cfg(feature = "diesel")]
 use diesel_async::sync_connection_wrapper::SyncConnectionWrapper;
-use rclite::Arc;
+use std::fmt::Debug;
 
 use serde::{Deserialize, Serialize};
 use surrealdb::{
@@ -16,13 +13,9 @@ use surrealdb::{
     engine::local::{Db, SurrealKv},
 };
 use surrealdb_types::SurrealValue;
-use tokio::{
-    io::{AsyncRead, AsyncWrite},
-    sync::RwLock,
-};
+use tokio::io::{AsyncRead, AsyncWrite};
 use tracing::info;
 
-use crate::db::user::I2PAddress;
 use crate::db::{
     comments::Post,
     follow_index::IndexFollow,
@@ -41,10 +34,7 @@ use crate::{
     errors::{DecodeError, EncodeError},
     helpers::{Byteable, now_timestamp},
 };
-use crate::{
-    db::index::content::Content,
-    hash::{Hash, PublicKey},
-};
+use crate::{db::index::content::Content, hash::PublicKey};
 
 // ==================== End Imports ====================
 
@@ -59,12 +49,6 @@ pub mod user;
 
 pub type Timestamp = u64;
 pub const BLOOM_FILTER_FALSE_POSITIVE_RATE: f64 = 0.0001;
-
-pub struct PaginateSearch<T> {
-    search: T,
-    take: usize,
-    skip: usize,
-}
 
 #[derive(Deserialize)]
 pub struct PaginateResponse<T> {
@@ -219,7 +203,7 @@ impl Repositories {
                         config.eepsite_address().clone(),
                     );
                     user.set_trust(TrustLevel::Ignore);
-                    let res = user_repository.upsert_user(user).await.unwrap();
+                    user_repository.upsert_user(user).await.unwrap();
                 }
                 _ => {}
             }

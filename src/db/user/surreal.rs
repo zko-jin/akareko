@@ -1,7 +1,5 @@
-use rand::seq::IteratorRandom;
 use surrealdb::{Surreal, engine::local::Db, types::RecordId};
 use surrealdb_types::{SurrealValue, Value};
-use tracing::info;
 
 use crate::{
     db::{

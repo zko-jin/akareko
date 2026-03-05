@@ -1,6 +1,6 @@
 use fastbloom::BloomFilter;
 use rclite::Arc;
-use tokio::sync::{Mutex, RwLock};
+use tokio::sync::Mutex;
 use tracing::{error, info};
 use yosemite::{Session, SessionOptions, Stream, style};
 
@@ -21,7 +21,7 @@ use crate::{
     hash::{Hash, PublicKey},
     server::{
         handler::{
-            self, AkarekoProtocolCommand, AkarekoProtocolCommandRequest,
+            self, AkarekoProtocolCommandRequest,
             events::SyncEventsRequest,
             index::{GetAllIndexesRequest, GetContents, GetContentsRequest},
             users::{get_users::GetUsersRequest, who::WhoRequest},

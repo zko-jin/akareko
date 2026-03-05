@@ -1,12 +1,9 @@
 use surrealdb_types::SurrealValue;
-use tokio::io::{AsyncRead, AsyncWrite};
-use tracing::trace;
 
 use crate::{
-    db::{SurrealPhantom, Timestamp, index::tags::IndexTag},
-    errors::{DecodeError, EncodeError},
+    db::{SurrealPhantom, index::tags::IndexTag},
     hash::{Hash, PrivateKey, PublicKey, Signature},
-    helpers::{Byteable, SanitizedString, now_timestamp},
+    helpers::SanitizedString,
 };
 
 // ==================== End Imports ====================

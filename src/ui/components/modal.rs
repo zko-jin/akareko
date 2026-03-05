@@ -4,8 +4,9 @@ use iced::{
 };
 
 use crate::ui::{
-    AppState, Message,
+    AppState,
     components::modal::add_who::{AddWhoModal, AddWhoModalMessage},
+    message::Message,
 };
 
 pub mod add_who;

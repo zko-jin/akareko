@@ -1,4 +1,4 @@
-use tokio::io::{AsyncRead, AsyncReadExt, AsyncWrite, AsyncWriteExt};
+use tokio::io::{AsyncRead, AsyncWrite};
 
 use crate::{
     db::{index::tags::MangaTag, user::I2PAddress},
@@ -14,7 +14,7 @@ pub mod index;
 mod macros;
 pub mod events {
     mod sync_events;
-    pub use sync_events::{SyncEvents, SyncEventsRequest, SyncEventsResponse};
+    pub use sync_events::{SyncEvents, SyncEventsRequest};
 }
 pub mod post {
     mod get_posts_by_topic;

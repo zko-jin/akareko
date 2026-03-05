@@ -4,11 +4,12 @@ use iced::{
 };
 
 use crate::ui::{
-    AppState, Message,
+    AppState,
     components::{
         modal::{Modal, add_who::AddWhoModal},
         toast::Toast,
     },
+    message::Message,
     views::{
         MangaListView, View, database_viewer::DatabaseViewerView, settings::SettingsView,
         user_list::UserListView,

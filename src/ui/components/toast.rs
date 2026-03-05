@@ -6,7 +6,7 @@ use iced::{
 use tokio::sync::mpsc;
 use tracing::error;
 
-use crate::{errors::DatabaseError, ui::Message};
+use crate::{errors::DatabaseError, ui::message::Message};
 
 #[derive(Debug, Clone)]
 pub struct Toast {

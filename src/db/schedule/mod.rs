@@ -1,6 +1,4 @@
-use std::{cmp::Reverse, collections::BinaryHeap};
-
-use surrealdb_types::SurrealValue;
+use std::collections::BinaryHeap;
 
 use crate::{
     db::{Timestamp, comments::Topic, user::I2PAddress},

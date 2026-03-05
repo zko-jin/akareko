@@ -2,7 +2,7 @@ use std::collections::HashSet;
 
 use const_format::formatcp;
 use fastbloom::BloomFilter;
-use surrealdb::{Surreal, engine::local::Db, method::Transaction};
+use surrealdb::{Surreal, engine::local::Db};
 use surrealdb_types::{RecordId, SurrealValue};
 use tracing::info;
 

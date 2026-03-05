@@ -8,7 +8,6 @@ use crate::{
         index::{Index, content::Content, tags::IndexTag},
         user::User,
     },
-    errors::DecodeError,
     hash::{Hash, PublicKey, Signature},
 };
 

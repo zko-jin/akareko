@@ -6,9 +6,8 @@ use crate::{
     db::{
         Timestamp,
         index::{
-            Index,
             content::Content,
-            tags::{IndexTag, MangaTag, NoTag},
+            tags::{IndexTag, MangaTag},
         },
         user::I2PAddress,
     },

@@ -159,7 +159,7 @@ impl<'a> SerializeStruct for &'a mut CustomSerializer {
 
     type Error = <Self as Serializer>::Error;
 
-    fn serialize_field<T>(&mut self, key: &'static str, value: &T) -> Result<(), Self::Error>
+    fn serialize_field<T>(&mut self, _: &'static str, value: &T) -> Result<(), Self::Error>
     where
         T: ?Sized + Serialize,
     {
@@ -176,7 +176,7 @@ impl<'a> SerializeStructVariant for &'a mut CustomSerializer {
 
     type Error = <Self as Serializer>::Error;
 
-    fn serialize_field<T>(&mut self, key: &'static str, value: &T) -> Result<(), Self::Error>
+    fn serialize_field<T>(&mut self, _: &'static str, value: &T) -> Result<(), Self::Error>
     where
         T: ?Sized + Serialize,
     {
@@ -290,22 +290,22 @@ impl<'a> Serializer for &'a mut CustomSerializer {
         Ok(())
     }
 
-    fn serialize_unit_struct(self, name: &'static str) -> Result<Self::Ok, Self::Error> {
+    fn serialize_unit_struct(self, _: &'static str) -> Result<Self::Ok, Self::Error> {
         Ok(())
     }
 
     fn serialize_unit_variant(
         self,
-        name: &'static str,
+        _: &'static str,
         variant_index: u32,
-        variant: &'static str,
+        _: &'static str,
     ) -> Result<Self::Ok, Self::Error> {
         variant_index.serialize(self)
     }
 
     fn serialize_newtype_struct<T>(
         self,
-        name: &'static str,
+        _: &'static str,
         value: &T,
     ) -> Result<Self::Ok, Self::Error>
     where
@@ -316,10 +316,10 @@ impl<'a> Serializer for &'a mut CustomSerializer {
 
     fn serialize_newtype_variant<T>(
         self,
-        name: &'static str,
-        variant_index: u32,
-        variant: &'static str,
-        value: &T,
+        _: &'static str,
+        _: u32,
+        _: &'static str,
+        _: &T,
     ) -> Result<Self::Ok, Self::Error>
     where
         T: ?Sized + Serialize,
@@ -342,24 +342,24 @@ impl<'a> Serializer for &'a mut CustomSerializer {
         Ok(self)
     }
 
-    fn serialize_tuple(self, len: usize) -> Result<Self::SerializeTuple, Self::Error> {
+    fn serialize_tuple(self, _len: usize) -> Result<Self::SerializeTuple, Self::Error> {
         Ok(self)
     }
 
     fn serialize_tuple_struct(
         self,
-        name: &'static str,
-        len: usize,
+        _name: &'static str,
+        _len: usize,
     ) -> Result<Self::SerializeTupleStruct, Self::Error> {
         Ok(self)
     }
 
     fn serialize_tuple_variant(
-        mut self,
-        name: &'static str,
-        variant_index: u32,
-        variant: &'static str,
-        len: usize,
+        self,
+        _name: &'static str,
+        _variant_index: u32,
+        _variant: &'static str,
+        _len: usize,
     ) -> Result<Self::SerializeTupleVariant, Self::Error> {
         // variant_index.serialize(self)?;
         // Ok(self)
@@ -381,18 +381,18 @@ impl<'a> Serializer for &'a mut CustomSerializer {
 
     fn serialize_struct(
         self,
-        name: &'static str,
-        len: usize,
+        _name: &'static str,
+        _len: usize,
     ) -> Result<Self::SerializeStruct, Self::Error> {
         Ok(self)
     }
 
     fn serialize_struct_variant(
         self,
-        name: &'static str,
-        variant_index: u32,
-        variant: &'static str,
-        len: usize,
+        _name: &'static str,
+        _variant_index: u32,
+        _variant: &'static str,
+        _len: usize,
     ) -> Result<Self::SerializeStructVariant, Self::Error> {
         // variant_index.serialize(self)?;
         // Ok(())
@@ -405,7 +405,7 @@ struct CustomDeserializer<'de>(&'de [u8]);
 impl<'de, 'a> Deserializer<'de> for &'a mut CustomDeserializer<'de> {
     type Error = DecodeError;
 
-    fn deserialize_any<V>(self, visitor: V) -> Result<V::Value, Self::Error>
+    fn deserialize_any<V>(self, _visitor: V) -> Result<V::Value, Self::Error>
     where
         V: serde::de::Visitor<'de>,
     {
@@ -640,7 +640,7 @@ impl<'de, 'a> Deserializer<'de> for &'a mut CustomDeserializer<'de> {
 
     fn deserialize_unit_struct<V>(
         self,
-        name: &'static str,
+        _name: &'static str,
         visitor: V,
     ) -> Result<V::Value, Self::Error>
     where
@@ -651,7 +651,7 @@ impl<'de, 'a> Deserializer<'de> for &'a mut CustomDeserializer<'de> {
 
     fn deserialize_newtype_struct<V>(
         self,
-        name: &'static str,
+        _name: &'static str,
         visitor: V,
     ) -> Result<V::Value, Self::Error>
     where
@@ -673,7 +673,7 @@ impl<'de, 'a> Deserializer<'de> for &'a mut CustomDeserializer<'de> {
         visitor.visit_seq(CommaSeparated { de: self, len })
     }
 
-    fn deserialize_tuple<V>(self, len: usize, visitor: V) -> Result<V::Value, Self::Error>
+    fn deserialize_tuple<V>(self, _len: usize, _visitor: V) -> Result<V::Value, Self::Error>
     where
         V: serde::de::Visitor<'de>,
     {
@@ -682,9 +682,9 @@ impl<'de, 'a> Deserializer<'de> for &'a mut CustomDeserializer<'de> {
 
     fn deserialize_tuple_struct<V>(
         self,
-        name: &'static str,
-        len: usize,
-        visitor: V,
+        _name: &'static str,
+        _len: usize,
+        _visitor: V,
     ) -> Result<V::Value, Self::Error>
     where
         V: serde::de::Visitor<'de>,
@@ -692,7 +692,7 @@ impl<'de, 'a> Deserializer<'de> for &'a mut CustomDeserializer<'de> {
         unimplemented!()
     }
 
-    fn deserialize_map<V>(self, visitor: V) -> Result<V::Value, Self::Error>
+    fn deserialize_map<V>(self, _visitor: V) -> Result<V::Value, Self::Error>
     where
         V: serde::de::Visitor<'de>,
     {
@@ -718,9 +718,9 @@ impl<'de, 'a> Deserializer<'de> for &'a mut CustomDeserializer<'de> {
 
     fn deserialize_enum<V>(
         self,
-        name: &'static str,
-        variants: &'static [&'static str],
-        visitor: V,
+        _name: &'static str,
+        _variants: &'static [&'static str],
+        _visitor: V,
     ) -> Result<V::Value, Self::Error>
     where
         V: serde::de::Visitor<'de>,
@@ -728,14 +728,14 @@ impl<'de, 'a> Deserializer<'de> for &'a mut CustomDeserializer<'de> {
         todo!()
     }
 
-    fn deserialize_identifier<V>(self, visitor: V) -> Result<V::Value, Self::Error>
+    fn deserialize_identifier<V>(self, _visitor: V) -> Result<V::Value, Self::Error>
     where
         V: serde::de::Visitor<'de>,
     {
         todo!()
     }
 
-    fn deserialize_ignored_any<V>(self, visitor: V) -> Result<V::Value, Self::Error>
+    fn deserialize_ignored_any<V>(self, _visitor: V) -> Result<V::Value, Self::Error>
     where
         V: serde::de::Visitor<'de>,
     {

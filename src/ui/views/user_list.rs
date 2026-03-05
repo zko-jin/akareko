@@ -12,8 +12,9 @@ use crate::{
     },
     hash::PublicKey,
     ui::{
-        AppState, Message,
+        AppState,
         components::toast::Toast,
+        message::Message,
         views::{View, ViewMessage},
     },
 };

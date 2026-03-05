@@ -1,18 +1,16 @@
-use const_format::formatcp;
 use fastbloom::BloomFilter;
 use surrealdb::{Surreal, engine::local::Db, types::RecordId};
-use surrealdb_types::{RecordIdKey, SurrealValue, Value};
-use tracing::info;
+use surrealdb_types::Value;
 
 use crate::{
     db::{
         BLOOM_FILTER_FALSE_POSITIVE_RATE, Content, Timestamp,
         comments::Topic,
-        event::{Event, EventType, insert_event},
-        index::{Index, IndexTag, tags::MangaTag},
+        event::{Event, insert_event},
+        index::{Index, IndexTag},
     },
     errors::DatabaseError,
-    hash::{Hash, PublicKey, Signature},
+    hash::{Hash, Signature},
     helpers::now_timestamp,
 };
 

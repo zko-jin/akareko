@@ -9,11 +9,12 @@ use crate::{
     db::user::{I2PAddress, TrustLevel, User},
     errors::ClientError,
     ui::{
-        AppState, ClientPool, Message,
+        AppState,
         components::{
             modal::{Modal, ModalMessage},
             toast::{Toast, ToastType},
         },
+        message::Message,
     },
 };
 

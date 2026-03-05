@@ -7,7 +7,7 @@ use yosemite::{Session, SessionOptions, style};
 
 use crate::{
     config::AkarekoConfig,
-    db::{Repositories, user::I2PAddress},
+    db::Repositories,
     errors::{DecodeError, ServerError},
     helpers::{Byteable, b32_from_pub_b64},
     server::protocol::AkarekoProtocolVersion,

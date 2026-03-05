@@ -26,8 +26,9 @@ use tokio::{
 use tracing::error;
 
 use crate::ui::{
-    AppState, Message,
+    AppState,
     components::toast::Toast,
+    message::Message,
     views::{View, ViewMessage},
 };
 

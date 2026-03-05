@@ -1,6 +1,6 @@
-use proc_macro::{Ident, TokenStream};
+use proc_macro::TokenStream;
 use quote::quote;
-use syn::{Attribute, Data, DeriveInput, Index, Meta, parse, parse_macro_input};
+use syn::{Attribute, Data, DeriveInput, Index, parse_macro_input};
 
 #[proc_macro_derive(Byteable, attributes(byteable))]
 pub fn derive_byteable(input: TokenStream) -> TokenStream {
@@ -61,7 +61,7 @@ fn derive_byteable_struct(
 
     let (encode_section, decode_section) = match kind {
         FieldKind::Named => {
-            let (field_idents, skipped_fields, attributes) = {
+            let (field_idents, skipped_fields, _attributes) = {
                 let mut field_idents = vec![];
                 let mut skipped_fields = vec![];
                 let mut attributes = vec![];
@@ -145,7 +145,7 @@ fn derive_byteable_struct(
 fn derive_byteable_enum(
     data_enum: syn::DataEnum,
     name: syn::Ident,
-    generics: syn::Generics,
+    _generics: syn::Generics,
 ) -> TokenStream {
     let mut decode_match_arms = Vec::new();
     let mut next_auto_discriminant = 0u8;

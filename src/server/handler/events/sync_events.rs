@@ -1,32 +1,23 @@
 use fastbloom::BloomFilter;
-use strum::IntoEnumIterator;
 
 use crate::{
     db::{
         Timestamp,
-        comments::Post,
         event::{EventType, filter_events},
-        index::{Index, content::Content, tags::MangaTag},
-        user::{I2PAddress, User},
+        index::tags::MangaTag,
+        user::I2PAddress,
     },
     hash::{Hash, PublicKey, Signature},
     helpers::{Byteable, now_timestamp},
     server::{
         ServerState,
         handler::{
-            AkarekoProtocolCommand, AkarekoProtocolCommandHandler, AkarekoProtocolCommandMetadata,
+            AkarekoProtocolCommandHandler, AkarekoProtocolCommandMetadata,
             AkarekoProtocolCommandRequest,
         },
-        protocol::{AkarekoProtocolRequest, AkarekoProtocolResponse, StreamDecode},
+        protocol::AkarekoProtocolResponse,
     },
 };
-
-pub enum EventData {
-    User(User),
-    MangaIndex(Index<MangaTag>),
-    MangaContent(Content<MangaTag>),
-    Post(Post),
-}
 
 pub struct SyncEvents;
 
@@ -47,7 +38,7 @@ impl AkarekoProtocolCommandHandler for SyncEvents {
     async fn handle<S: tokio::io::AsyncRead + tokio::io::AsyncWrite + Unpin + Send>(
         stream: &mut S,
         state: &ServerState,
-        address: &I2PAddress,
+        _: &I2PAddress,
     ) {
         let req = SyncEventsRequest::decode(stream).await.unwrap();
 

@@ -7,7 +7,8 @@ use iced_aw::number_input;
 use crate::{
     db::index::{Index, tags::MangaTag},
     ui::{
-        AppState, Message,
+        AppState,
+        message::Message,
         views::{View, ViewMessage, novel_list::MangaListView},
     },
 };
@@ -87,7 +88,7 @@ impl AddNovelView {
                 }
                 AddMangaMessage::SavedNovel => {
                     v.title = String::new();
-                    return Task::done(Message::ChangeView(View::MangaList(MangaListView::new())));
+                    return Task::done(Message::BackHistory);
                 }
             }
         }

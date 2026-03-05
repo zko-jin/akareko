@@ -15,8 +15,9 @@ use crate::{
     },
     helpers::now_timestamp,
     ui::{
-        AppState, Message,
+        AppState,
         components::toast::{Toast, ToastType},
+        message::Message,
         views::{View, ViewMessage},
     },
 };

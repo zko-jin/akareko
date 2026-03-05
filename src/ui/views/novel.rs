@@ -18,11 +18,12 @@ use crate::{
     },
     helpers::SanitizedString,
     ui::{
-        AppState, Message,
+        AppState,
         components::toast::Toast,
         icons::{
             BOOK_BOOKMARK_ICON, CHAT_ICON, CHECK_CIRCLE_ICON, DOWNLOAD_ICON, SEEN_ICON, UNSEEN_ICON,
         },
+        message::Message,
         style,
         views::{
             View, ViewMessage, add_chapter::AddMangaChapterView, image_viewer::ImageViewerView,

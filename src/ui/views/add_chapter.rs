@@ -15,7 +15,8 @@ use crate::{
     },
     helpers::{Language, now_timestamp},
     ui::{
-        AppState, Message,
+        AppState,
+        message::Message,
         views::{View, ViewMessage, novel::MangaView},
     },
 };
@@ -204,9 +205,7 @@ impl AddMangaChapterView {
                 AddMangaChapterMessage::SavedContent => {
                     v.entries = vec![];
                     v.magnet = String::new();
-                    return Task::done(Message::ChangeView(View::Novel(MangaView::new(
-                        v.novel.clone(),
-                    ))));
+                    return Task::done(Message::BackHistory);
                 }
             }
         }

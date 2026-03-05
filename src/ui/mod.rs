@@ -22,7 +22,7 @@ use crate::{
         user::I2PAddress,
     },
     hash::PublicKey,
-    helpers::now_timestamp,
+    helpers::{LiFo, now_timestamp},
     server::{
         AkarekoServer,
         client::{AkarekoClient, TIME_OFFSET, pool::ClientPool},
@@ -39,6 +39,7 @@ use crate::{
 
 mod components;
 mod icons;
+mod message;
 mod style;
 mod tray;
 mod views;
@@ -47,73 +48,6 @@ mod views;
 pub enum TrayIconMessage {
     OpenWindow,
     Exit,
-}
-
-#[derive(Debug, Clone)]
-pub enum Message {
-    OpenWindow(WindowType),
-    CloseWindow(iced::window::Id),
-    Exit,
-
-    RepositoryLoaded(Repositories),
-    ConfigLoaded(AkarekoConfig),
-    TorrentClientLoaded(TorrentClient),
-    ClientLoaded(AkarekoClient),
-    DownloadTorrent { magnet: String, path: String },
-    ChangeView(View),
-    ViewMessage(ViewMessage),
-    BackHistory,
-
-    ToastSenderReady(mpsc::Sender<Toast>),
-    PostToast(Toast),
-    CloseToast(usize),
-
-    ModalMessage(ModalMessage),
-    OpenModal(Modal),
-    CloseModal,
-
-    SaveTorrent,
-
-    AddSchedule(Schedule),
-    RemoveSchedule(Schedule),
-    LoadFullSyncAddresses(Vec<(I2PAddress, FullSyncTarget)>),
-    TryConsumeSchedule,
-
-    TrayIconMessage(TrayIconMessage),
-
-    Nothing,
-}
-
-#[derive(Debug, Clone)]
-pub struct LiFo<T, const N: usize> {
-    stack: [Option<T>; N],
-    last_index: usize,
-}
-
-impl<T, const N: usize> LiFo<T, N> {
-    pub fn new() -> Self {
-        Self {
-            stack: [const { None }; N],
-            last_index: N - 1,
-        }
-    }
-
-    pub fn push(&mut self, item: T) {
-        self.last_index = (self.last_index + 1) % N;
-        self.stack[self.last_index] = Some(item);
-    }
-
-    pub fn pop(&mut self) -> Option<T> {
-        let item = self.stack[self.last_index].take();
-        if item.is_some() {
-            self.last_index = (self.last_index + N - 1) % N;
-        }
-        item
-    }
-
-    pub fn can_pop(&self) -> bool {
-        self.stack[self.last_index].is_some()
-    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -167,17 +101,17 @@ impl AppState {
         }
     }
 
-    pub fn boot() -> (AppState, Task<Message>) {
+    pub fn boot() -> (AppState, Task<message::Message>) {
         let args = CliArgs::parse();
 
         let open_task = match args.minimized {
             true => Task::none(),
-            false => Task::done(Message::OpenWindow(WindowType::Main)),
+            false => Task::done(message::Message::OpenWindow(WindowType::Main)),
         };
         (
             AppState::new(),
             open_task.chain(Task::perform(AkarekoConfig::load(), |c| {
-                Message::ConfigLoaded(c)
+                message::Message::ConfigLoaded(c)
             })),
         )
     }
@@ -190,7 +124,7 @@ impl AppState {
         self.theme.clone()
     }
 
-    pub fn view(&self, _id: window::Id) -> iced::Element<'_, Message> {
+    pub fn view(&self, _id: window::Id) -> iced::Element<'_, message::Message> {
         if !self.has_initialized() {
             return column![text("Loading...")].into();
         }
@@ -198,7 +132,7 @@ impl AppState {
         let mut back = button(text("Back"));
 
         if self.history.can_pop() {
-            back = back.on_press(Message::BackHistory);
+            back = back.on_press(message::Message::BackHistory);
         }
 
         let base = column![back, View::view(self)]
@@ -206,7 +140,7 @@ impl AppState {
             .height(iced::Length::Fill);
 
         let base = if self.modal.is_some() {
-            modal(base, Modal::view(self), Message::CloseModal)
+            modal(base, Modal::view(self), message::Message::CloseModal)
         } else {
             base.into()
         };
@@ -228,10 +162,10 @@ impl AppState {
         .into()
     }
 
-    pub fn update(&mut self, message: Message) -> Task<Message> {
+    pub fn update(&mut self, message: message::Message) -> Task<message::Message> {
         match message {
-            Message::Exit => return iced::exit(),
-            Message::ConfigLoaded(c) => {
+            message::Message::Exit => return iced::exit(),
+            message::Message::ConfigLoaded(c) => {
                 self.config = c.clone();
 
                 // Nothing is using it here as it's still in the initialization process so it's ok to use blocking_write
@@ -244,12 +178,12 @@ impl AppState {
 
                 return Task::batch([
                     Task::perform(AkarekoClient::new(config.clone()), |c| {
-                        Message::ClientLoaded(c)
+                        message::Message::ClientLoaded(c)
                     }),
                     Task::future(async move {
                         info!("Initializing Repositories...");
                         let r = Repositories::initialize(&config).await;
-                        Message::RepositoryLoaded(r)
+                        message::Message::RepositoryLoaded(r)
                     }),
                     Task::future(async move {
                         let mut settings_pack = SettingsPack::new();
@@ -265,7 +199,7 @@ impl AppState {
                             Ok(_) => {}
                             Err(e) => {
                                 error!("Failed to load torrents: {}", e);
-                                return Message::PostToast(Toast {
+                                return message::Message::PostToast(Toast {
                                     title: "Failed to load torrents".to_string(),
                                     body: e.to_string(),
                                     ty: ToastType::Error,
@@ -273,11 +207,11 @@ impl AppState {
                             }
                         }
 
-                        Message::TorrentClientLoaded(client)
+                        message::Message::TorrentClientLoaded(client)
                     }),
                 ]);
             }
-            Message::RepositoryLoaded(r) => {
+            message::Message::RepositoryLoaded(r) => {
                 self.repositories = Some(r.clone());
 
                 let server_config = self.server_config.clone();
@@ -304,78 +238,78 @@ impl AppState {
                         .map(|(u, t)| (u.into_address(), t))
                         .collect();
 
-                    Message::LoadFullSyncAddresses(addresses)
+                    message::Message::LoadFullSyncAddresses(addresses)
                 });
             }
-            Message::TorrentClientLoaded(t) => {
+            message::Message::TorrentClientLoaded(t) => {
                 self.torrent_client = Some(t);
             }
-            Message::ClientLoaded(client) => {
+            message::Message::ClientLoaded(client) => {
                 self.client_pool = Some(ClientPool::new(
                     client,
                     self.config.max_client_connections() as u16,
                 ));
             }
-            Message::DownloadTorrent { magnet, path } => {
+            message::Message::DownloadTorrent { magnet, path } => {
                 if let Some(torrent_client) = &self.torrent_client {
                     let client = torrent_client.clone();
 
                     return Task::future(async move {
                         let _ = client.add_magnet(&magnet, &path).await;
-                        Message::Nothing
+                        message::Message::Nothing
                     });
                 }
             }
-            Message::ChangeView(v) => {
+            message::Message::ChangeView(v) => {
                 let old_view = std::mem::replace(&mut self.view, v);
                 self.history.push(old_view);
                 return View::on_enter(self);
             }
-            Message::ViewMessage(m) => {
+            message::Message::ViewMessage(m) => {
                 return View::update(m, self);
             }
-            Message::ModalMessage(m) => {
+            message::Message::ModalMessage(m) => {
                 return Modal::update(m, self);
             }
-            Message::BackHistory => {
+            message::Message::BackHistory => {
                 if let Some(v) = self.history.pop() {
                     self.view = v;
                     return View::on_enter(self);
                 }
             }
-            Message::ToastSenderReady(tx) => {
+            message::Message::ToastSenderReady(tx) => {
                 if self.toast_tx.is_some() {
                     error!("Tried to set ToastSenderReady twice");
                 } else {
                     self.toast_tx = Some(tx);
                 }
             }
-            Message::PostToast(toast) => {
+            message::Message::PostToast(toast) => {
                 self.add_toast(toast);
             }
-            Message::CloseToast(i) => {
+            message::Message::CloseToast(i) => {
                 self.toasts.remove(i);
             }
-            Message::OpenModal(m) => {
+            message::Message::OpenModal(m) => {
                 self.modal = Some(m);
             }
-            Message::CloseModal => {
+            message::Message::CloseModal => {
                 self.close_modal();
             }
-            Message::SaveTorrent => {
+            message::Message::SaveTorrent => {
                 if let Some(client) = &self.torrent_client {
                     let client = client.clone();
                     return Task::future(async move {
                         client.save(PathBuf::from("./data/torrents")).await.unwrap();
-                        Message::Nothing
+                        message::Message::Nothing
                     });
                 }
             }
-            Message::OpenWindow(window_type) => {
+            message::Message::OpenWindow(window_type) => {
                 match window_type {
                     WindowType::Main => {
                         if self.windows.values().any(|v| *v == window_type) {
-                            return Task::done(Message::Nothing);
+                            return Task::done(message::Message::Nothing);
                         }
                     }
                 }
@@ -389,19 +323,19 @@ impl AppState {
 
                 self.windows.insert(id, window_type);
 
-                return task.map(|_| Message::Nothing);
+                return task.map(|_| message::Message::Nothing);
             }
-            Message::CloseWindow(id) => {
+            message::Message::CloseWindow(id) => {
                 let window_type = self.windows.remove(&id).unwrap();
                 return window::close(id);
             }
-            Message::AddSchedule(schedule) => {
+            message::Message::AddSchedule(schedule) => {
                 self.scheduler.schedule(schedule);
             }
-            Message::RemoveSchedule(schedule) => {
+            message::Message::RemoveSchedule(schedule) => {
                 self.scheduler.remove(schedule);
             }
-            Message::TryConsumeSchedule => {
+            message::Message::TryConsumeSchedule => {
                 let (Some(pool), Some(db)) = (self.client_pool.clone(), self.repositories.clone())
                 else {
                     return Task::none();
@@ -424,7 +358,7 @@ impl AppState {
                                 Ok(t) => t,
                                 Err(e) => {
                                     error!("Failed to sync events: {}", e);
-                                    return Message::AddSchedule(Schedule {
+                                    return message::Message::AddSchedule(Schedule {
                                         when: now_timestamp() + scheduler_config.full_sync_interval,
                                         address: schedule.address,
                                         schedule_type: schedule.schedule_type,
@@ -487,7 +421,7 @@ impl AppState {
                         }
                     };
 
-                    Message::AddSchedule(Schedule {
+                    message::Message::AddSchedule(Schedule {
                         when: now_timestamp() + increment,
                         address: schedule.address,
                         schedule_type: schedule.schedule_type,
@@ -495,7 +429,7 @@ impl AppState {
                     })
                 });
             }
-            Message::LoadFullSyncAddresses(a) => {
+            message::Message::LoadFullSyncAddresses(a) => {
                 for (address, target) in a {
                     self.scheduler.schedule(Schedule {
                         when: target.last_sync + self.config.scheduler_config().full_sync_interval,
@@ -505,15 +439,15 @@ impl AppState {
                     });
                 }
             }
-            Message::TrayIconMessage(m) => match m {
+            message::Message::TrayIconMessage(m) => match m {
                 TrayIconMessage::OpenWindow => {
-                    return Task::done(Message::OpenWindow(WindowType::Main));
+                    return Task::done(message::Message::OpenWindow(WindowType::Main));
                 }
                 TrayIconMessage::Exit => {
-                    return Task::done(Message::Exit);
+                    return Task::done(message::Message::Exit);
                 }
             },
-            Message::Nothing => {}
+            message::Message::Nothing => {}
         }
 
         Task::none()
@@ -527,20 +461,21 @@ impl AppState {
         self.modal = None;
     }
 
-    pub fn subscription(&self) -> iced::Subscription<Message> {
+    pub fn subscription(&self) -> iced::Subscription<message::Message> {
         let toast_subscription = Subscription::run(toast_worker);
         let view_subscription = self.view.subscription();
 
         let tray_icon_subscription = self.tray_icon.subscribe();
 
         Subscription::batch([
-            iced::time::every(std::time::Duration::from_millis(500)).map(|_| Message::Nothing),
+            iced::time::every(std::time::Duration::from_millis(500))
+                .map(|_| message::Message::Nothing),
             iced::time::every(std::time::Duration::from_millis(3500))
-                .map(|_| Message::TryConsumeSchedule),
+                .map(|_| message::Message::TryConsumeSchedule),
             toast_subscription,
             view_subscription,
-            window::close_requests().map(Message::CloseWindow),
-            tray_icon_subscription.map(|m| Message::TrayIconMessage(m)),
+            window::close_requests().map(message::Message::CloseWindow),
+            tray_icon_subscription.map(|m| message::Message::TrayIconMessage(m)),
         ])
     }
 }

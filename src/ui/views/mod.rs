@@ -12,7 +12,8 @@ pub mod user_list;
 use iced::Task;
 
 use crate::ui::{
-    AppState, Message,
+    AppState,
+    message::Message,
     views::{
         add_chapter::{AddMangaChapterMessage, AddMangaChapterView},
         add_novel::{AddMangaMessage, AddNovelView},

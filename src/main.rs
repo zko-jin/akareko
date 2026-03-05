@@ -1,28 +1,14 @@
 #![allow(dead_code)]
 
 use clap::Parser;
-use fastbloom::BloomFilter;
-use iced::Task;
-use tokio::sync::mpsc;
 use tracing::info;
 use tracing_subscriber::EnvFilter;
 use tracing_subscriber::Layer;
 use tracing_subscriber::fmt;
 use tracing_subscriber::layer::SubscriberExt;
 use tracing_subscriber::util::SubscriberInitExt;
-use trayicon::Icon;
-use trayicon::MenuBuilder;
-use trayicon::TrayIcon;
-use trayicon::TrayIconBuilder;
 
-use crate::config::AkarekoConfig;
-
-use crate::db::BLOOM_FILTER_FALSE_POSITIVE_RATE;
-use crate::db::comments::Topic;
 use crate::ui::AppState;
-use crate::ui::Message;
-use crate::ui::TrayIconMessage;
-use crate::ui::WindowType;
 
 mod config;
 mod db;

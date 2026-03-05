@@ -1,9 +1,6 @@
-use std::path::Display;
-
-use const_format::formatcp;
 use fastbloom::BloomFilter;
 use num_enum::{IntoPrimitive, TryFromPrimitive};
-use strum_macros::{EnumCount, EnumIter};
+use strum_macros::EnumCount;
 use surrealdb::{Surreal, engine::local::Db, method::Transaction};
 use surrealdb_types::{SurrealValue, Value};
 use tokio::io::{AsyncRead, AsyncWrite};
@@ -206,7 +203,6 @@ impl std::hash::Hash for Event {
 
 #[cfg(test)]
 mod tests {
-    use std::path::PathBuf;
 
     use crate::{
         db::{Repositories, index::Index},

@@ -3,17 +3,23 @@ use tokio::io::{AsyncRead, AsyncReadExt, AsyncWrite, AsyncWriteExt};
 use crate::errors::{DecodeError, EncodeError};
 
 pub trait Byteable {
-    async fn encode<W: AsyncWrite + Unpin + Send>(&self, writer: &mut W)
-    -> Result<(), EncodeError>;
-    async fn decode<R: AsyncRead + Unpin + Send>(reader: &mut R) -> Result<Self, DecodeError>
+    fn encode<W: AsyncWrite + Unpin + Send>(
+        &self,
+        writer: &mut W,
+    ) -> impl Future<Output = Result<(), EncodeError>>;
+    fn decode<R: AsyncRead + Unpin + Send>(
+        reader: &mut R,
+    ) -> impl Future<Output = Result<Self, DecodeError>>
     where
         Self: Sized;
 }
 
 // Replace byteable later with these 2
 pub trait Encodeable {
-    async fn encode<W: AsyncWrite + Unpin + Send>(&self, writer: &mut W)
-    -> Result<(), EncodeError>;
+    fn encode<W: AsyncWrite + Unpin + Send>(
+        &self,
+        writer: &mut W,
+    ) -> impl Future<Output = Result<(), EncodeError>>;
 }
 
 pub trait Decodeable {

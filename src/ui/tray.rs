@@ -4,7 +4,7 @@ use tokio::sync::mpsc;
 use tracing::error;
 use trayicon::{Icon, MenuBuilder, TrayIcon, TrayIconBuilder};
 
-use crate::ui::{Message, TrayIconMessage};
+use crate::ui::{TrayIconMessage, message::Message};
 
 pub fn initialize_tray_icon() -> TrayIcon<TrayIconMessage> {
     const ICON: &'static [u8] = include_bytes!("../../assets/tray_icon.ico");
