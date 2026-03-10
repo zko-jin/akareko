@@ -1,11 +1,9 @@
 use fastbloom::BloomFilter;
 
 use crate::{
-    db::{
-        comments::{Post, Topic},
-        user::I2PAddress,
-    },
+    db::{comments::Post, user::I2PAddress},
     server::{ServerState, handler::AkarekoProtocolCommand, protocol::AkarekoProtocolResponse},
+    types::{Timestamp, Topic},
 };
 
 pub struct GetPostsByTopic;
@@ -22,7 +20,6 @@ impl AkarekoProtocolCommand for GetPostsByTopic {
     ) -> AkarekoProtocolResponse<Self::ResponsePayload, Self::ResponseData> {
         let Ok(posts) = state
             .repositories
-            .posts()
             .get_filtered_posts_by_topic(req.topic, req.timestamp, req.filter)
             .await
         else {
@@ -36,7 +33,7 @@ impl AkarekoProtocolCommand for GetPostsByTopic {
 #[derive(byteable_derive::Byteable)]
 pub struct GetPostsByTopicRequest {
     pub topic: Topic,
-    pub timestamp: u64,
+    pub timestamp: Option<Timestamp>,
     pub filter: Option<BloomFilter>,
 }
 

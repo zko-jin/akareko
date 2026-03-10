@@ -7,7 +7,7 @@ use crate::{
         index::{Index, tags::IndexTag},
     },
     errors::DatabaseError,
-    hash::Hash,
+    types::Hash,
 };
 
 pub struct IndexFollowRepository<'a> {

@@ -2,13 +2,11 @@ use fastbloom::BloomFilter;
 
 use crate::{
     db::{
-        Timestamp,
         event::{EventType, filter_events},
         index::tags::MangaTag,
         user::I2PAddress,
     },
-    hash::{Hash, PublicKey, Signature},
-    helpers::{Byteable, now_timestamp},
+    helpers::Byteable,
     server::{
         ServerState,
         handler::{
@@ -17,6 +15,7 @@ use crate::{
         },
         protocol::AkarekoProtocolResponse,
     },
+    types::{Hash, PublicKey, Signature, Timestamp},
 };
 
 pub struct SyncEvents;
@@ -66,7 +65,7 @@ impl AkarekoProtocolCommandHandler for SyncEvents {
 
         AkarekoProtocolResponse::<SyncEventsResponse>::ok(SyncEventsResponse {
             decode_streams,
-            timestamp: now_timestamp(),
+            timestamp: Timestamp::now(),
         })
         .encode(stream)
         .await
@@ -134,12 +133,7 @@ impl AkarekoProtocolCommandHandler for SyncEvents {
                         .map(|v| unsafe { Signature::from_bytes_unchecked(v.to_inner()) })
                         .collect::<Vec<_>>();
 
-                    let posts = state
-                        .repositories
-                        .posts()
-                        .get_posts(&signatures)
-                        .await
-                        .unwrap();
+                    let posts = state.repositories.get_posts(&signatures).await.unwrap();
 
                     for post in posts {
                         post.encode(stream).await.unwrap();

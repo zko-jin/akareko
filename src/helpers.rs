@@ -1,5 +1,3 @@
-use std::time::{SystemTime, UNIX_EPOCH};
-
 use base64::{Engine, prelude::BASE64_STANDARD};
 use data_encoding::BASE32_NOPAD;
 use serde::{Deserialize, Serialize};
@@ -9,13 +7,14 @@ use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use unicode_normalization::UnicodeNormalization;
 
 use crate::{
-    db::{Timestamp, user::I2PAddress},
+    db::user::I2PAddress,
     errors::{DecodeError, I2PParseError},
 };
 
 mod bloom_filter;
 mod byteable;
 mod lifo;
+mod serde_byteable;
 pub use byteable::{Byteable, Decodeable, Encodeable};
 pub use lifo::LiFo;
 
@@ -56,13 +55,6 @@ pub enum Language {
     French,
     Portuguese,
     Unknown,
-}
-
-pub fn now_timestamp() -> Timestamp {
-    SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .expect("Time went backwards")
-        .as_secs()
 }
 
 fn i2p_b64_fix(s: &str) -> String {

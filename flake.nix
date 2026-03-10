@@ -28,18 +28,11 @@
           packages = with pkgs; [
             cargo
             clang
-
-            xdotool
-            libappindicator-gtk3
-            libayatana-appindicator
-            pango
-
             clang-tools
             rust-analyzer
             rustc
             rustfmt
             rustup
-
             boost
             boost-build
             diesel-cli

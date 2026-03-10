@@ -6,8 +6,8 @@ use crate::{
         },
         user::I2PAddress,
     },
-    hash::Hash,
     server::{ServerState, handler::AkarekoProtocolCommand, protocol::AkarekoProtocolResponse},
+    types::Hash,
 };
 
 pub struct GetIndexes<I: IndexTag>(std::marker::PhantomData<I>);

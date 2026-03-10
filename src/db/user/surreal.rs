@@ -3,13 +3,11 @@ use surrealdb_types::{SurrealValue, Value};
 
 use crate::{
     db::{
-        comments::Topic,
         event::{Event, EventType, insert_event},
         user::TrustLevel,
     },
     errors::DatabaseError,
-    hash::PublicKey,
-    helpers::now_timestamp,
+    types::{PublicKey, Timestamp, Topic},
 };
 
 use super::User;
@@ -50,7 +48,7 @@ impl<'a> UserRepository<'a> {
     pub async fn upsert_user(&self, user: User) -> Result<(), DatabaseError> {
         let transaction = self.db.clone().begin().await?;
 
-        let timestamp = now_timestamp();
+        let timestamp = Timestamp::now();
 
         let event = Event {
             timestamp,
@@ -70,7 +68,7 @@ impl<'a> UserRepository<'a> {
     pub async fn upsert_users(&self, users: Vec<User>) -> Result<(), DatabaseError> {
         let transaction = self.db.clone().begin().await?;
 
-        let timestamp = now_timestamp();
+        let timestamp = Timestamp::now();
 
         let events = users
             .iter()

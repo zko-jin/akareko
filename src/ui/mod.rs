@@ -16,17 +16,16 @@ use crate::{
     config::AkarekoConfig,
     db::{
         FullSyncTarget, Repositories,
-        event::make_event_filter,
         index::tags::MangaTag,
         schedule::{Schedule, ScheduleType, Scheduler},
         user::I2PAddress,
     },
-    hash::PublicKey,
-    helpers::{LiFo, now_timestamp},
+    helpers::LiFo,
     server::{
         AkarekoServer,
         client::{AkarekoClient, TIME_OFFSET, pool::ClientPool},
     },
+    types::Timestamp,
     ui::{
         components::{
             modal::{Modal, ModalMessage, modal},
@@ -359,7 +358,8 @@ impl AppState {
                                 Err(e) => {
                                     error!("Failed to sync events: {}", e);
                                     return message::Message::AddSchedule(Schedule {
-                                        when: now_timestamp() + scheduler_config.full_sync_interval,
+                                        when: Timestamp::now()
+                                            + scheduler_config.full_sync_interval,
                                         address: schedule.address,
                                         schedule_type: schedule.schedule_type,
                                         last_sync: schedule.last_sync,
@@ -381,11 +381,7 @@ impl AppState {
                                 .index()
                                 .make_filter::<MangaTag>(
                                     &hash,
-                                    if schedule.last_sync < TIME_OFFSET {
-                                        schedule.last_sync - TIME_OFFSET
-                                    } else {
-                                        0
-                                    },
+                                    Some(schedule.last_sync - TIME_OFFSET),
                                 )
                                 .await
                                 .unwrap();
@@ -395,34 +391,29 @@ impl AppState {
                                     &schedule.address,
                                     db.index(),
                                     hash.clone(),
-                                    schedule.last_sync,
+                                    Some(schedule.last_sync),
                                     Some(filter),
                                 )
                                 .await
                                 .unwrap();
 
-                            (0, 0)
+                            (Timestamp::new(0), Timestamp::new(0))
                         }
                         ScheduleType::SyncPost(ref topic) => {
                             let filter = db
-                                .posts()
-                                .make_filter(
+                                .make_posts_filter(
                                     topic.clone(),
-                                    if schedule.last_sync < TIME_OFFSET {
-                                        schedule.last_sync - TIME_OFFSET
-                                    } else {
-                                        0
-                                    },
+                                    Some(schedule.last_sync - TIME_OFFSET),
                                 )
                                 .await
                                 .unwrap();
 
-                            (0, 0)
+                            (Timestamp::new(0), Timestamp::new(0))
                         }
                     };
 
                     message::Message::AddSchedule(Schedule {
-                        when: now_timestamp() + increment,
+                        when: Timestamp::now() + increment,
                         address: schedule.address,
                         schedule_type: schedule.schedule_type,
                         last_sync: server_timestamp,

@@ -3,19 +3,14 @@ use std::collections::HashSet;
 use iced::{
     Subscription, Task,
     widget::{
-        Column, Row, Text, button, row, scrollable, table, text,
+        Column, Text, button, row, scrollable, table, text,
         text_editor::{self, Content},
     },
 };
 use surrealdb_types::{ToSql, Value};
 
 use crate::{
-    db::{
-        comments::{Post, Topic},
-        event::{Event, get_paginated_events, make_event_filter},
-        user::User,
-    },
-    helpers::now_timestamp,
+    db::event::{Event, get_paginated_events},
     ui::{
         AppState,
         components::toast::{Toast, ToastType},
@@ -25,7 +20,7 @@ use crate::{
 };
 
 #[derive(Clone, Debug)]
-enum Tab {
+pub enum Tab {
     FreeQuery(Content, String),
     Users,
     Events {
@@ -117,10 +112,6 @@ impl DatabaseViewerView {
                 cur_page,
                 total_pages,
             } => {
-                // id
-                // timestamp: Timestamp,
-                //  event_type: EventType,
-                //  topic: Topic,
                 let table = table(
                     vec![
                         table::column("Id", |e: &Event| text(e.topic.as_base64())),

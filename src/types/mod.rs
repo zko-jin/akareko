@@ -11,7 +11,13 @@ use surrealdb_types::{SerializationError, SurrealValue};
 use crate::errors::Base64Error;
 
 mod keys;
+mod string;
+mod timestamp;
+mod topic;
 pub use keys::{PrivateKey, PublicKey, Signable, Signature};
+pub use string::*;
+pub use timestamp::Timestamp;
+pub use topic::Topic;
 
 #[derive(
     Debug,

@@ -2,7 +2,7 @@ use surrealdb_types::SurrealValue;
 
 use crate::{
     db::{SurrealPhantom, Timestamp, index::tags::IndexTag},
-    hash::Hash,
+    types::Hash,
 };
 
 #[cfg(feature = "surrealdb")]

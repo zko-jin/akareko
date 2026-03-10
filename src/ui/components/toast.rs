@@ -22,10 +22,10 @@ impl Into<Message> for Toast {
 }
 
 impl Toast {
-    pub fn error(title: String, body: String) -> Self {
+    pub fn error(title: impl ToString, body: impl ToString) -> Self {
         Self {
-            title,
-            body,
+            title: title.to_string(),
+            body: body.to_string(),
             ty: ToastType::Error,
         }
     }

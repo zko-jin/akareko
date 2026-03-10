@@ -8,11 +8,11 @@ use tokio::io::{AsyncRead, AsyncWrite};
 use crate::{
     db::{
         BLOOM_FILTER_FALSE_POSITIVE_RATE, Timestamp,
-        comments::Topic,
         index::tags::{IndexTag, MangaTag},
     },
     errors::{DatabaseError, DecodeError, EncodeError},
     helpers::{Byteable, Encodeable},
+    types::Topic,
 };
 
 #[derive(SurrealValue, Debug, Clone)]
@@ -24,6 +24,14 @@ pub struct Event {
 
 pub async fn insert_event(events: Vec<Event>, db: &Transaction<Db>) -> Result<(), DatabaseError> {
     let _: Vec<Value> = db.insert("events").content(events).await?;
+    Ok(())
+}
+
+pub async fn remove_event(topic: Topic, db: &Transaction<Db>) -> Result<(), DatabaseError> {
+    const QUERY_STR: &str = "DELETE FROM events WHERE topic = $topic;";
+
+    db.query(QUERY_STR).bind(("topic", topic)).await?;
+
     Ok(())
 }
 
@@ -206,7 +214,7 @@ mod tests {
 
     use crate::{
         db::{Repositories, index::Index},
-        hash::PrivateKey,
+        types::PrivateKey,
     };
 
     use super::*;
@@ -218,7 +226,9 @@ mod tests {
 
         repo.index().add_index(index.clone()).await.unwrap();
 
-        let filter = make_event_filter(0, &repo.db).await.unwrap();
+        let filter = make_event_filter(Timestamp::new(0), &repo.db)
+            .await
+            .unwrap();
 
         let topic = Topic::from_index(&index);
 

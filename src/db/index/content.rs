@@ -2,10 +2,10 @@ use surrealdb_types::SurrealValue;
 use tokio::io::{AsyncRead, AsyncWrite};
 
 use crate::{
-    db::{Magnet, Timestamp, ToBytes, index::tags::IndexTag},
+    db::{Magnet, ToBytes, index::tags::IndexTag},
     errors::{DecodeError, EncodeError},
-    hash::{Hash, PrivateKey, PublicKey, Signature},
     helpers::Byteable,
+    types::{Hash, PrivateKey, PublicKey, Signature, Timestamp},
 };
 
 // ==================== End Imports ====================
@@ -81,7 +81,7 @@ impl<T: IndexTag> Content<T> {
         entries: &Vec<ContentEntry<T>>,
     ) -> Vec<u8> {
         let mut bytes: Vec<u8> = index_hash.inner().to_vec().to_vec();
-        bytes.extend(timestamp.to_be_bytes());
+        bytes.extend(timestamp.to_bytes());
         bytes.extend(magnet_link.0.as_bytes());
         for entry in entries {
             bytes.extend(entry.to_bytes());

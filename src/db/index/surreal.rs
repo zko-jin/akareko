@@ -1,17 +1,15 @@
 use fastbloom::BloomFilter;
 use surrealdb::{Surreal, engine::local::Db, types::RecordId};
-use surrealdb_types::Value;
+use surrealdb_types::{SurrealValue, Table, Value};
 
 use crate::{
     db::{
-        BLOOM_FILTER_FALSE_POSITIVE_RATE, Content, Timestamp,
-        comments::Topic,
-        event::{Event, insert_event},
+        BLOOM_FILTER_FALSE_POSITIVE_RATE, Content,
+        event::{Event, insert_event, remove_event},
         index::{Index, IndexTag},
     },
     errors::DatabaseError,
-    hash::{Hash, Signature},
-    helpers::now_timestamp,
+    types::{Hash, Signature, Timestamp, Topic},
 };
 
 // ==================== End Imports ====================
@@ -30,7 +28,7 @@ impl<'a> IndexRepository<'a> {
     pub async fn add_index<T: IndexTag>(&self, index: Index<T>) -> Result<Index<T>, DatabaseError> {
         let transaction = self.db.clone().begin().await?;
 
-        let timestamp = now_timestamp();
+        let timestamp = Timestamp::now();
 
         let event = Event {
             timestamp,
@@ -52,13 +50,10 @@ impl<'a> IndexRepository<'a> {
         Ok(r)
     }
 
-    pub async fn add_content<T: IndexTag + 'static>(
-        &self,
-        content: Content<T>,
-    ) -> Result<(), DatabaseError> {
+    pub async fn add_content<T: IndexTag>(&self, content: Content<T>) -> Result<(), DatabaseError> {
         let transaction = self.db.clone().begin().await?;
 
-        let timestamp = now_timestamp();
+        let timestamp = Timestamp::now();
 
         let event = Event {
             timestamp,
@@ -78,27 +73,47 @@ impl<'a> IndexRepository<'a> {
         Ok(())
     }
 
+    pub async fn remove_content<T: IndexTag>(
+        &self,
+        signature: Signature,
+    ) -> Result<(), DatabaseError> {
+        let transaction = self.db.clone().begin().await?;
+
+        let topic = Topic::from_signature(signature.clone());
+
+        remove_event(topic, &transaction).await?;
+
+        let _: Option<Value> = transaction
+            .delete(RecordId::new(T::CONTENT_TABLE, signature.as_base64()))
+            .await?;
+
+        transaction.commit().await?;
+
+        Ok(())
+    }
+
     pub async fn get_all_indexes<T: IndexTag>(
         &self,
-        timestamp: Timestamp,
+        timestamp: Option<Timestamp>,
         filter: Option<BloomFilter>,
     ) -> Result<Vec<Index<T>>, DatabaseError> {
-        let query = format!(
+        let query_str = format!(
             "SELECT * FROM {} {};",
             T::TAG,
-            if timestamp != 0 {
+            if timestamp.is_some() {
                 "WHERE timestamp >= $timestamp"
             } else {
                 ""
             }
         );
 
-        let results: Vec<Index<T>> = self
-            .db
-            .query(query)
-            .bind(("timestamp", timestamp))
-            .await?
-            .take(0)?;
+        let mut query = self.db.query(query_str);
+
+        if let Some(timestamp) = timestamp {
+            query = query.bind(("timestamp", timestamp));
+        }
+
+        let results: Vec<Index<T>> = query.await?.take(0)?;
 
         let filtered_indexes = match filter {
             Some(filter) => results
@@ -160,25 +175,26 @@ impl<'a> IndexRepository<'a> {
     pub async fn get_filtered_index_contents<T: IndexTag>(
         &self,
         index_hash: Hash,
-        timestamp: Timestamp,
+        timestamp: Option<Timestamp>,
         filter: Option<BloomFilter>,
     ) -> Result<Vec<Content<T>>, DatabaseError> {
-        let query: String = format!(
+        let query_str: String = format!(
             "SELECT * FROM {} WHERE index_hash = $index_hash {};",
             T::CONTENT_TABLE,
-            if timestamp != 0 {
+            if timestamp.is_some() {
                 "WHERE timestamp >= $timestamp"
             } else {
                 ""
             }
         );
 
-        let results: Vec<Content<T>> = self
-            .db
-            .query(query)
-            .bind(("index_hash", index_hash))
-            .await?
-            .take(0)?;
+        let mut query = self.db.query(query_str).bind(("index_hash", index_hash));
+
+        if let Some(timestamp) = timestamp {
+            query = query.bind(("timestamp", timestamp));
+        }
+
+        let results: Vec<Content<T>> = query.await?.take(0)?;
 
         let contents = match filter {
             Some(filter) => results
@@ -194,27 +210,30 @@ impl<'a> IndexRepository<'a> {
     pub async fn make_filter<T: IndexTag>(
         &self,
         index_hash: &Hash,
-        timestamp: u64,
+        timestamp: Option<Timestamp>,
     ) -> Result<BloomFilter, DatabaseError> {
-        let query: String = format!(
+        let query_str: String = format!(
             "
                 SELECT * FROM {0} WHERE index_hash = $index_hash {1};
             ",
             T::CONTENT_TABLE,
-            if timestamp != 0 {
+            if timestamp.is_some() {
                 " AND timestamp >= $timestamp"
             } else {
                 ""
             }
         );
 
-        let result: Vec<Content<T>> = self
+        let mut query = self
             .db
-            .query(query)
-            .bind(("index_hash", index_hash.as_base64()))
-            .bind(("timestamp", timestamp))
-            .await?
-            .take(0)?;
+            .query(query_str)
+            .bind(("index_hash", index_hash.as_base64()));
+
+        if let Some(timestamp) = timestamp {
+            query = query.bind(("timestamp", timestamp));
+        }
+
+        let result: Vec<Content<T>> = query.await?.take(0)?;
 
         let mut filter = BloomFilter::with_false_pos(BLOOM_FILTER_FALSE_POSITIVE_RATE)
             .expected_items(result.len());

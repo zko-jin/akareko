@@ -1,9 +1,10 @@
 [target.x86_64-pc-windows-msvc]
 linker = "lld-link"
+# rustc-link-search = ["C:/Program Files (x86)/Windows Kits/10/Lib/10.0.26100.0/um/x64"]
 
 [build]
 rustflags = [
-    "-Clinker-plugin-lto",
-    "-Clinker=clang",
+    # "-Clinker-plugin-lto",
+    # "-Clinker=clang",
     # "-Clink-arg=-fuse-ld=lld"
 ]

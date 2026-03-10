@@ -2,37 +2,25 @@ use std::collections::HashSet;
 
 use const_format::formatcp;
 use fastbloom::BloomFilter;
-use surrealdb::{Surreal, engine::local::Db};
 use surrealdb_types::{RecordId, SurrealValue};
 use tracing::info;
 
 use crate::{
     db::{
-        BLOOM_FILTER_FALSE_POSITIVE_RATE, PaginateResponse,
+        BLOOM_FILTER_FALSE_POSITIVE_RATE, PaginateResponse, Repositories,
         comments::{Post, Topic},
         event::{Event, EventType, insert_event},
         user::User,
     },
     errors::DatabaseError,
-    hash::Signature,
-    helpers::now_timestamp,
+    types::{Signature, Timestamp},
 };
 
-pub struct PostRepository<'a> {
-    db: &'a Surreal<Db>,
-}
-
-impl<'a> PostRepository<'a> {
-    pub fn new(db: &'a Surreal<Db>) -> PostRepository<'a> {
-        PostRepository { db }
-    }
-}
-
-impl<'a> PostRepository<'a> {
-    pub async fn add_comment(&self, post: Post) -> Result<Post, DatabaseError> {
+impl Repositories {
+    pub async fn add_post(&self, post: Post) -> Result<Post, DatabaseError> {
         let transaction = self.db.clone().begin().await?;
 
-        let timestamp = now_timestamp();
+        let timestamp = Timestamp::now();
 
         let event = Event {
             timestamp,
@@ -119,30 +107,30 @@ impl<'a> PostRepository<'a> {
         }
     }
 
-    pub async fn make_filter(
+    pub async fn make_posts_filter(
         &self,
         topic: Topic,
-        timestamp: u64,
+        timestamp: Option<Timestamp>,
     ) -> Result<BloomFilter, DatabaseError> {
-        let query: String = format!(
+        let query_str: String = format!(
             "
                 SELECT * FROM {0} WHERE topic = $topic {1};
             ",
             Post::TABLE_NAME,
-            if timestamp != 0 {
+            if timestamp.is_some() {
                 " AND timestamp >= $timestamp"
             } else {
                 ""
             }
         );
 
-        let result: Vec<Post> = self
-            .db
-            .query(query)
-            .bind(("topic", topic))
-            .bind(("timestamp", timestamp))
-            .await?
-            .take(0)?;
+        let mut query = self.db.query(query_str).bind(("topic", topic));
+
+        if let Some(timestamp) = timestamp {
+            query = query.bind(("timestamp", timestamp));
+        }
+
+        let result: Vec<Post> = query.await?.take(0)?;
 
         let mut filter = BloomFilter::with_false_pos(BLOOM_FILTER_FALSE_POSITIVE_RATE)
             .expected_items(result.len());
@@ -178,28 +166,28 @@ impl<'a> PostRepository<'a> {
     pub async fn get_filtered_posts_by_topic(
         &self,
         topic: Topic,
-        timestamp: u64,
+        timestamp: Option<Timestamp>,
         filter: Option<BloomFilter>,
     ) -> Result<Vec<Post>, DatabaseError> {
-        let query: String = format!(
+        let query_str: String = format!(
             "
                 SELECT * FROM {0} WHERE topic = $topic {1};
             ",
             Post::TABLE_NAME,
-            if timestamp != 0 {
-                " AND timestamp >= $timestamp"
+            if timestamp.is_some() {
+                "AND timestamp >= $timestamp"
             } else {
                 ""
             }
         );
 
-        let result: Vec<Post> = self
-            .db
-            .query(query)
-            .bind(("topic", topic))
-            .bind(("timestamp", timestamp))
-            .await?
-            .take(0)?;
+        let mut query = self.db.query(query_str).bind(("topic", topic));
+
+        if let Some(timestamp) = timestamp {
+            query = query.bind(("timestamp", timestamp));
+        }
+
+        let result: Vec<Post> = query.await?.take(0)?;
 
         let filtered_posts = match filter {
             Some(filter) => result.into_iter().filter(|p| !filter.contains(p)).collect(),

@@ -8392,7 +8392,7 @@ dependencies = [
 [[package]]
 name = "trayicon"
 version = "0.4.0"
-source = "git+https://github.com/pliduino/trayicon-rs.git?branch=master#c56425f85250befa4322d9d38bdc9cf83220f1bf"
+source = "git+https://github.com/pliduino/trayicon-rs.git?branch=master#9354516bf3ff3c73a63ba6eb2f09d785a576bfa9"
 dependencies = [
  "futures",
  "iced_futures",

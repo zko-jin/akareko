@@ -13,8 +13,8 @@ use strum_macros::EnumIter;
 use surrealdb::types::SurrealValue;
 
 use crate::{
-    db::Timestamp,
-    hash::{PrivateKey, PublicKey, Signable, Signature},
+    db::{Timestamp, ToBytes},
+    types::{PrivateKey, PublicKey, Signable, Signature, String8},
 };
 
 #[cfg(feature = "sqlite")]
@@ -126,7 +126,7 @@ impl Display for I2PAddress {
 pub struct User {
     #[cfg_attr(feature = "surrealdb", surreal(rename = "id"))]
     pub_key: PublicKey,
-    name: String,
+    name: String8,
     timestamp: Timestamp,
     signature: Signature,
     /// To prevent a user from faking the address of another user we need to  confirm the address
@@ -189,7 +189,7 @@ impl User {
     pub const TABLE_NAME: &str = "users";
 
     pub fn new(
-        name: String,
+        name: String8,
         timestamp: Timestamp,
         pub_key: PublicKey,
         signature: Signature,
@@ -206,7 +206,7 @@ impl User {
     }
 
     pub fn new_signed(
-        name: String,
+        name: String8,
         timestamp: Timestamp,
         priv_key: &PrivateKey,
         address: I2PAddress,
@@ -223,8 +223,8 @@ impl User {
     }
 
     pub fn verification_bytes(&self) -> Vec<u8> {
-        let mut bytes = self.name.as_bytes().to_vec();
-        bytes.extend(self.timestamp.to_le_bytes());
+        let mut bytes = self.name.inner().as_bytes().to_vec();
+        bytes.extend(self.timestamp.to_bytes());
         bytes.extend(self.address.inner().as_bytes());
         bytes
     }
@@ -239,8 +239,8 @@ impl User {
         self.pub_key.verify(&to_verify, &self.signature)
     }
 
-    pub fn name(&self) -> &String {
-        &self.name
+    pub fn name(&self) -> &str {
+        self.name.as_ref()
     }
 
     pub fn timestamp(&self) -> Timestamp {
@@ -277,26 +277,6 @@ impl User {
 
     pub fn set_trust(&mut self, trust: TrustLevel) {
         self.trust = trust;
-    }
-
-    pub fn as_tuple(
-        self,
-    ) -> (
-        PublicKey,
-        String,
-        Timestamp,
-        I2PAddress,
-        Signature,
-        TrustLevel,
-    ) {
-        (
-            self.pub_key,
-            self.name,
-            self.timestamp,
-            self.address,
-            self.signature,
-            self.trust,
-        )
     }
 }
 

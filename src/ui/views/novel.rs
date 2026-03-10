@@ -7,16 +7,13 @@ use tokio::sync::watch;
 use tracing::info;
 
 use crate::{
-    db::{
-        comments::Topic,
-        follow_index::IndexFollow,
-        index::{
-            Index,
-            content::Content,
-            tags::{IndexTag as _, MangaTag},
-        },
+    db::index::{
+        Index,
+        content::Content,
+        tags::{IndexTag as _, MangaTag},
     },
     helpers::SanitizedString,
+    types::Topic,
     ui::{
         AppState,
         components::toast::Toast,
@@ -51,6 +48,7 @@ pub enum MangaMessage {
     UpdateProgress(usize, usize, f32),
     TorrentStatusUpdated,
     LoadedFollow(bool),
+    ExcludeChapter(usize),
     ToggleFollow,
 }
 
@@ -78,7 +76,7 @@ impl MangaView {
                 return Task::future(async move {
                     let chapters = repositories
                         .index()
-                        .get_filtered_index_contents(novel_hash, 0, None)
+                        .get_filtered_index_contents(novel_hash, None, None)
                         .await;
                     MangaMessage::ContentLoaded(chapters.unwrap()).into()
                 });
@@ -256,14 +254,30 @@ impl MangaView {
                                 Ok(f) => f.is_some(),
                                 Err(e) => {
                                     return Message::PostToast(Toast::error(
-                                        "Failed to get follow status".into(),
-                                        e.to_string(),
+                                        "Failed to get follow status",
+                                        e,
                                     ));
                                 }
                             };
 
                             MangaMessage::LoadedFollow(f).into()
                         });
+                    }
+                }
+                MangaMessage::ExcludeChapter(i) => {
+                    if let Some(repositories) = state.repositories.clone() {
+                        let ch = v.chapters.remove(i);
+                        return Task::future(async move {
+                            repositories
+                                .index()
+                                .remove_content::<MangaTag>(ch.signature().clone())
+                                .await
+                                .unwrap();
+
+                            Message::Nothing
+                        });
+                    } else {
+                        return Task::done(Toast::error("Repository is not loaded.", "").into());
                     }
                 }
                 MangaMessage::LoadedFollow(f) => {

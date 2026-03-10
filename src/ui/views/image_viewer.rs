@@ -135,8 +135,8 @@ impl ImageViewerView {
                         if !path.exists() {
                             match output
                                 .send(Message::PostToast(Toast::error(
-                                    "Could not load chapter".into(),
-                                    "Path does not exist".into(),
+                                    "Could not load chapter",
+                                    "Path does not exist",
                                 )))
                                 .await
                             {
@@ -178,7 +178,7 @@ impl ImageViewerView {
                                         error!("Error loading image {}: {}", path.display(), e);
                                         let _ = output
                                             .send(Message::PostToast(Toast::error(
-                                                "Could not load image".into(),
+                                                "Could not load image",
                                                 format!("Error loading image: {}", e),
                                             )))
                                             .await;
@@ -246,7 +246,7 @@ impl ImageViewerView {
                                             );
                                             let _ = output
                                                 .send(Message::PostToast(Toast::error(
-                                                    "Could not load image".into(),
+                                                    "Could not load image",
                                                     format!("Error loading image: {}", e),
                                                 )))
                                                 .await;

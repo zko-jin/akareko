@@ -1,4 +1,3 @@
-#[cfg(feature = "surrealdb")]
 #[cfg(feature = "diesel")]
 use diesel::SqliteConnection;
 #[cfg(feature = "diesel")]
@@ -16,15 +15,16 @@ use surrealdb_types::SurrealValue;
 use tokio::io::{AsyncRead, AsyncWrite};
 use tracing::info;
 
+#[cfg(feature = "surrealdb")]
+use crate::db::follow_index::IndexFollowRepository;
 use crate::db::{
     comments::Post,
     follow_index::IndexFollow,
     index::tags::{IndexTag, MangaTag},
 };
-#[cfg(feature = "surrealdb")]
-use crate::db::{comments::PostRepository, follow_index::IndexFollowRepository};
 // use crate::db::{comments::PostRepository, follow_index::IndexFollowRepository};
 use crate::errors::DatabaseError;
+use crate::types::Timestamp;
 use crate::{
     config::AkarekoConfig,
     db::{
@@ -32,9 +32,9 @@ use crate::{
         user::{User, UserRepository},
     },
     errors::{DecodeError, EncodeError},
-    helpers::{Byteable, now_timestamp},
+    helpers::Byteable,
 };
-use crate::{db::index::content::Content, hash::PublicKey};
+use crate::{db::index::content::Content, types::PublicKey};
 
 // ==================== End Imports ====================
 
@@ -47,7 +47,6 @@ pub mod schedule;
 pub mod schema;
 pub mod user;
 
-pub type Timestamp = u64;
 pub const BLOOM_FILTER_FALSE_POSITIVE_RATE: f64 = 0.0001;
 
 #[derive(Deserialize)]
@@ -140,7 +139,7 @@ impl FullSyncTarget {
     pub fn from_user(user: &User) -> Self {
         Self {
             pub_key: user.pub_key().clone(),
-            last_sync: 0,
+            last_sync: Timestamp::new(0),
         }
     }
 }
@@ -194,11 +193,11 @@ impl Repositories {
             let user_repository = repositories.user();
             match user_repository.get_user(&config.public_key()).await {
                 Err(_) => {
-                    use crate::db::user::TrustLevel;
+                    use crate::{db::user::TrustLevel, types::String8};
 
                     let mut user = User::new_signed(
-                        "Anon".to_string(),
-                        now_timestamp(),
+                        String8::new("Anon".to_string()).unwrap(),
+                        Timestamp::now(),
                         &config.private_key(),
                         config.eepsite_address().clone(),
                     );
@@ -250,10 +249,6 @@ impl Repositories {
 
     pub fn index(&self) -> IndexRepository<'_> {
         IndexRepository::new(&self.db)
-    }
-
-    pub fn posts(&self) -> PostRepository<'_> {
-        PostRepository::new(&self.db)
     }
 
     pub fn index_follow(&self) -> IndexFollowRepository<'_> {

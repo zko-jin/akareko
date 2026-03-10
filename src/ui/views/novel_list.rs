@@ -47,14 +47,11 @@ impl MangaListView {
             let repositories = repositories.clone();
 
             return Task::future(async move {
-                let novels = match repositories.index().get_all_indexes(0, None).await {
+                let novels = match repositories.index().get_all_indexes(None, None).await {
                     Ok(novels) => novels,
                     Err(e) => {
                         error!("Failed to get all indexes: {}", e);
-                        return Message::PostToast(Toast::error(
-                            "Failed to get all indexes".into(),
-                            e.to_string(),
-                        ));
+                        return Toast::error("Failed to get all indexes", e).into();
                     }
                 };
                 MangaListMessage::LoadedMangas(novels).into()

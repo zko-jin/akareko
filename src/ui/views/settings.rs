@@ -7,7 +7,7 @@ use tracing::info;
 use crate::{
     config::AkarekoConfig,
     db::user::{TrustLevel, User},
-    helpers::now_timestamp,
+    types::{String8, Timestamp},
     ui::{
         AppState,
         components::toast::{Toast, ToastType},
@@ -129,8 +129,8 @@ impl SettingsView {
                         v.old_name = std::mem::take(&mut v.new_name);
 
                         let mut new_user = User::new_signed(
-                            v.old_name.clone(),
-                            now_timestamp(),
+                            String8::new(v.old_name.clone()).unwrap(),
+                            Timestamp::now(),
                             state.config.private_key(),
                             state.config.eepsite_address().clone(),
                         );

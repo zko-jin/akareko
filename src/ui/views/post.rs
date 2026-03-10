@@ -9,11 +9,8 @@ use iced::{
 };
 
 use crate::{
-    db::{
-        comments::{Post, Topic},
-        user::User,
-    },
-    helpers::now_timestamp,
+    db::{comments::Post, user::User},
+    types::{String16, Timestamp, Topic},
     ui::{
         AppState,
         components::toast::{Toast, ToastType},
@@ -93,11 +90,15 @@ impl PostView {
 
         for post in &self.posts {
             let profile = Column::new().push(text(match self.users.get(&post.source) {
-                Some(user) => user.name().clone(),
-                None => "Unknown".to_string(),
+                Some(user) => user.name(),
+                None => "Unknown",
             }));
 
-            column = column.push(Row::new().push(profile).push(text(post.content.clone())));
+            column = column.push(
+                Row::new()
+                    .push(profile)
+                    .push(text(post.content.inner().clone())),
+            );
         }
 
         column = column
@@ -131,16 +132,16 @@ impl PostView {
                 PostMessage::AddPost => {
                     if let Some(repositories) = &state.repositories {
                         let repositories = repositories.clone();
-                        let now = now_timestamp();
+                        let now = Timestamp::now();
+                        let content = String16::new(v.content.text()).unwrap();
                         let post = Post::new_signed(
-                            v.content.text(),
-                            now,
+                            content,
                             now,
                             v.topic.clone(),
                             state.config.private_key(),
                         );
                         return Task::future(async move {
-                            match repositories.posts().add_comment(post).await {
+                            match repositories.add_post(post).await {
                                 Ok(p) => PostMessage::Posted(p).into(),
                                 Err(e) => Message::PostToast(Toast {
                                     title: "Failed to add post".to_string(),
@@ -172,7 +173,6 @@ impl PostView {
                         let topic = v.topic.clone();
                         return Task::future(async move {
                             let res = match repositories
-                                .posts()
                                 .get_posts_by_topic(
                                     topic,
                                     Self::POST_PER_PAGE,

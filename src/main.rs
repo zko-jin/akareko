@@ -13,9 +13,9 @@ use crate::ui::AppState;
 mod config;
 mod db;
 mod errors;
-mod hash;
 mod helpers;
 mod server;
+mod types;
 mod ui;
 
 #[derive(Parser)]

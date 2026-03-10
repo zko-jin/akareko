@@ -64,7 +64,7 @@ macro_rules! handler {
                         $(
                             [<Commands $version>]::$command => {
                                 $(
-                                    $middleware::apply(state, address).await.unwrap();
+                                    $middleware.apply(state, address).await.unwrap();
                                 )*
                                 <$handler as AkarekoProtocolCommandHandler>::handle(stream, state, address).await;
                             }

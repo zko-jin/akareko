@@ -1,3 +1,4 @@
+use ed25519_dalek::KEYPAIR_LENGTH;
 use fastbloom::BloomFilter;
 use rclite::Arc;
 use tokio::sync::Mutex;
@@ -7,7 +8,7 @@ use yosemite::{Session, SessionOptions, Stream, style};
 use crate::{
     config::AkarekoConfig,
     db::{
-        Repositories, Timestamp,
+        Repositories,
         comments::Post,
         event::{EventType, make_event_filter},
         index::{
@@ -18,7 +19,6 @@ use crate::{
         user::{I2PAddress, TrustLevel, User},
     },
     errors::ClientError,
-    hash::{Hash, PublicKey},
     server::{
         handler::{
             self, AkarekoProtocolCommandRequest,
@@ -27,11 +27,11 @@ use crate::{
             users::{get_users::GetUsersRequest, who::WhoRequest},
         },
         protocol::StreamDecode,
-        proxy::LoggingStream, // proxy::I2PConnector,
     },
+    types::{Hash, PublicKey, Timestamp},
 };
 
-pub const TIME_OFFSET: u64 = 60;
+pub const TIME_OFFSET: i64 = 60;
 
 pub mod pool;
 
@@ -49,7 +49,7 @@ macro_rules! impl_get_content {
                 url: &I2PAddress,
                 db: IndexRepository<'_>,
                 index_hash: Hash,
-                timestamp: Timestamp,
+                timestamp: Option<Timestamp>,
                 filter: Option<BloomFilter>,
             ) -> Result<(), ClientError> {
                 let mut stream = self.get_stream(url).await?;
@@ -113,12 +113,9 @@ impl AkarekoClient {
         }
     }
 
-    async fn get_stream(&mut self, url: &I2PAddress) -> Result<LoggingStream<Stream>, ClientError> {
+    async fn get_stream(&mut self, url: &I2PAddress) -> Result<Stream, ClientError> {
         let session = self.session.clone();
         let stream = session.lock().await.connect(url.inner()).await?;
-
-        let stream = LoggingStream(stream);
-
         Ok(stream)
     }
 
@@ -130,15 +127,7 @@ impl AkarekoClient {
     ) -> Result<Timestamp, ClientError> {
         let mut stream = self.get_stream(url).await?;
 
-        let filter = make_event_filter(
-            if timestamp > TIME_OFFSET {
-                timestamp - TIME_OFFSET
-            } else {
-                0
-            },
-            &repo.db,
-        )
-        .await?;
+        let filter = make_event_filter(timestamp - TIME_OFFSET, &repo.db).await?;
 
         let res = handler::events::SyncEvents::request(
             SyncEventsRequest {
@@ -202,7 +191,7 @@ impl AkarekoClient {
                             error!("Invalid post signature");
                             continue;
                         }
-                        repo.posts().add_comment(post).await?;
+                        repo.add_post(post).await?;
                     }
                 }
             }
@@ -219,7 +208,7 @@ impl AkarekoClient {
         &mut self,
         url: &I2PAddress,
         db: IndexRepository<'_>,
-        timestamp: Timestamp,
+        timestamp: Option<Timestamp>,
         filter: Option<BloomFilter>,
     ) -> Result<(), ClientError> {
         let mut stream = self.get_stream(url).await?;
@@ -364,7 +353,7 @@ impl AkarekoClient {
     // ╚===========================================================================╝
 
     /// Who function without creating a new stream
-    async fn who_internal(&self, stream: &mut LoggingStream<Stream>) -> Result<User, ClientError> {
+    async fn who_internal(&self, stream: &mut Stream) -> Result<User, ClientError> {
         let res = handler::users::Who::request(WhoRequest {}, stream).await?;
 
         if !res.status().is_ok() {

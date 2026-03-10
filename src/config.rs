@@ -6,8 +6,8 @@ use yosemite::RouterApi;
 use crate::{
     db::user::I2PAddress,
     errors::TomlSaveError,
-    hash::{PrivateKey, PublicKey},
     helpers::b32_from_pub_b64,
+    types::{PrivateKey, PublicKey, Timestamp},
 };
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -18,13 +18,13 @@ pub struct KeyPair {
 }
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SchedulerConfig {
-    pub full_sync_interval: u64,
+    pub full_sync_interval: Timestamp,
 }
 
 impl Default for SchedulerConfig {
     fn default() -> Self {
         Self {
-            full_sync_interval: 60 * 5, // 5 minutes
+            full_sync_interval: Timestamp::new(60 * 5), // 5 minutes
         }
     }
 }

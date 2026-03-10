@@ -2,8 +2,8 @@ use surrealdb_types::SurrealValue;
 
 use crate::{
     db::{SurrealPhantom, index::tags::IndexTag},
-    hash::{Hash, PrivateKey, PublicKey, Signature},
     helpers::SanitizedString,
+    types::{Hash, PrivateKey, PublicKey, Signature},
 };
 
 // ==================== End Imports ====================

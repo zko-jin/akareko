@@ -1,8 +1,10 @@
 use crate::{
-    db::user::{I2PAddress, User},
-    hash::{PrivateKey, Signature},
-    helpers::now_timestamp,
+    db::{
+        ToBytes,
+        user::{I2PAddress, User},
+    },
     server::{ServerState, handler::AkarekoProtocolCommand, protocol::AkarekoProtocolResponse},
+    types::{PrivateKey, Signature, Timestamp},
 };
 
 #[derive(Debug)]
@@ -48,13 +50,13 @@ pub struct WhoRequest {}
 #[derive(Debug, byteable_derive::Byteable)]
 pub struct WhoResponse {
     pub user: User,
-    pub timestamp: u64,
+    pub timestamp: Timestamp,
     pub signature: Signature, // Timestamp + Address of requesting user
 }
 
 impl WhoResponse {
     pub fn verification_bytes(&self, request_address: &I2PAddress) -> Vec<u8> {
-        let mut bytes = self.timestamp.to_le_bytes().to_vec();
+        let mut bytes = self.timestamp.to_bytes();
         bytes.extend(request_address.to_string().as_bytes());
         bytes
     }
@@ -62,7 +64,7 @@ impl WhoResponse {
     pub fn new_signed(user: User, request_address: &I2PAddress, priv_key: &PrivateKey) -> Self {
         let mut response = Self {
             user: user.into(),
-            timestamp: now_timestamp(),
+            timestamp: Timestamp::now(),
             signature: Signature::empty(),
         };
 

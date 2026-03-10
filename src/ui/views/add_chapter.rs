@@ -13,7 +13,8 @@ use crate::{
             tags::{MangaChapter, MangaTag},
         },
     },
-    helpers::{Language, now_timestamp},
+    helpers::Language,
+    types::Timestamp,
     ui::{
         AppState,
         message::Message,
@@ -157,7 +158,7 @@ impl AddMangaChapterView {
                         let chapter = Content::new_signed(
                             state.config.public_key().clone(),
                             index_hash,
-                            now_timestamp(),
+                            Timestamp::now(),
                             Magnet(v.magnet.clone()),
                             entries,
                             state.config.private_key(),

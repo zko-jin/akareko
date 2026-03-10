@@ -4,12 +4,11 @@ use fastbloom::BloomFilter;
 
 use crate::{
     db::{
-        Timestamp,
         index::{content::Content, tags::IndexTag},
         user::I2PAddress,
     },
-    hash::Hash,
     server::{ServerState, handler::AkarekoProtocolCommand, protocol::AkarekoProtocolResponse},
+    types::{Hash, Timestamp},
 };
 
 pub struct GetContents<I: IndexTag>(PhantomData<I>);
@@ -44,12 +43,12 @@ impl<I: IndexTag> AkarekoProtocolCommand for GetContents<I> {
 pub struct GetContentsRequest {
     index: Hash,
     /// Get indexes created_updated after this timestamp
-    after: Timestamp,
+    after: Option<Timestamp>,
     filter: Option<BloomFilter>,
 }
 
 impl GetContentsRequest {
-    pub fn new(index: Hash, after: Timestamp, filter: Option<BloomFilter>) -> Self {
+    pub fn new(index: Hash, after: Option<Timestamp>, filter: Option<BloomFilter>) -> Self {
         Self {
             index,
             after,

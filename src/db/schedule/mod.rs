@@ -1,9 +1,8 @@
 use std::collections::BinaryHeap;
 
 use crate::{
-    db::{Timestamp, comments::Topic, user::I2PAddress},
-    hash::{Hash, PublicKey},
-    helpers::now_timestamp,
+    db::user::I2PAddress,
+    types::{Hash, PublicKey, Timestamp, Topic},
 };
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -23,7 +22,7 @@ pub struct Schedule {
 
 impl Schedule {
     pub fn is_overdue(&self) -> bool {
-        self.when <= now_timestamp()
+        self.when <= Timestamp::now()
     }
 }
 

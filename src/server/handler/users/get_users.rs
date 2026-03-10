@@ -1,7 +1,7 @@
 use crate::{
     db::user::{I2PAddress, User},
-    hash::PublicKey,
     server::{ServerState, handler::AkarekoProtocolCommand, protocol::AkarekoProtocolResponse},
+    types::PublicKey,
 };
 
 pub struct GetUsers;

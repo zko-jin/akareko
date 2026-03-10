@@ -141,5 +141,4 @@ crate::handler!(V1,
     // ==================== Events ====================
     SyncEvents("event/sync_events") => events::SyncEvents
 
-    // ==================== Title ====================
 });

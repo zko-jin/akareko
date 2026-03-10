@@ -10,7 +10,7 @@ use crate::{
         schedule::{Schedule, ScheduleType},
         user::User,
     },
-    hash::PublicKey,
+    types::{PublicKey, Timestamp},
     ui::{
         AppState,
         components::toast::Toast,
@@ -56,11 +56,7 @@ impl UserListView {
                     Ok(targets) => targets,
                     Err(e) => {
                         error!("Failed to get full sync targets: {}", e);
-                        return Toast::error(
-                            "Failed to get full sync targets".into(),
-                            e.to_string(),
-                        )
-                        .into();
+                        return Toast::error("Failed to get full sync targets", e).into();
                     }
                 };
 
@@ -80,7 +76,7 @@ impl UserListView {
         for user in self.users.iter() {
             column.push(
                 row![
-                    text(user.name().clone() + " | "),
+                    text(user.name().to_string() + " | "),
                     text(user.pub_key().to_base64() + " | "),
                     text(user.address().to_string()),
                     checkbox(self.full_sync_targets.contains(user.pub_key())).on_toggle(move |b| {
@@ -141,10 +137,10 @@ impl UserListView {
                             .unwrap();
 
                         Message::RemoveSchedule(Schedule {
-                            when: 0,
+                            when: Timestamp::new(0),
                             address: user.address().clone(),
                             schedule_type: ScheduleType::FullSync(user.into_pub_key()),
-                            last_sync: 0,
+                            last_sync: Timestamp::new(0),
                         })
                     });
                 }
