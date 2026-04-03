@@ -39,6 +39,12 @@ impl<T: IndexTag> std::hash::Hash for Index<T> {
     }
 }
 
+impl<T: IndexTag> PartialEq for Index<T> {
+    fn eq(&self, other: &Self) -> bool {
+        self.hash == other.hash
+    }
+}
+
 impl<T: IndexTag> Index<T> {
     pub fn new(title: String, release_date: i32, source: PublicKey, signature: Signature) -> Self {
         let hash = Hash::digest(&Self::id_bytes(&title, &release_date));

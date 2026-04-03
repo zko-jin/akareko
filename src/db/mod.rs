@@ -22,7 +22,8 @@ use crate::db::{
     follow_index::IndexFollow,
     index::tags::{IndexTag, MangaTag},
 };
-// use crate::db::{comments::PostRepository, follow_index::IndexFollowRepository};
+// use crate::db::{comments::PostRepository,
+// follow_index::IndexFollowRepository};
 use crate::errors::DatabaseError;
 use crate::types::Timestamp;
 use crate::{
@@ -41,6 +42,7 @@ use crate::{db::index::content::Content, types::PublicKey};
 pub mod comments;
 pub mod event;
 pub mod follow_index;
+pub mod group;
 pub mod index;
 pub mod schedule;
 #[cfg(feature = "diesel")]
@@ -65,7 +67,7 @@ impl ToBytes for () {
     }
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, SurrealValue)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, Hash, SurrealValue)]
 #[serde(transparent)]
 pub struct Magnet(pub String);
 
@@ -146,8 +148,8 @@ impl FullSyncTarget {
 
 #[cfg(feature = "surrealdb")]
 impl Repositories {
-    /// Use Repositories::initialize() instead, this function is only so we can run tests
-    /// without setting a user and in memory
+    /// Use Repositories::initialize() instead, this function is only so we can
+    /// run tests without setting a user and in memory
     pub async fn setup(db: Surreal<Db>) -> Self {
         db.use_ns("akareko").use_db("main").await.unwrap();
 

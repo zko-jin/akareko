@@ -21,6 +21,55 @@ impl Into<Message> for Toast {
     }
 }
 
+pub enum ToastResult<T> {
+    Ok(T),
+    Err(Toast),
+}
+
+pub trait IntoToastResult<T> {
+    fn to_toast(self, title: impl ToString) -> ToastResult<T>;
+}
+
+impl<T, E: std::fmt::Display> IntoToastResult<T> for Result<T, E> {
+    fn to_toast(self, title: impl ToString) -> ToastResult<T> {
+        match self {
+            Ok(v) => ToastResult::Ok(v),
+            Err(e) => ToastResult::Err(Toast::error(title.to_string(), e.to_string())),
+        }
+    }
+}
+
+impl<T> core::ops::FromResidual for ToastResult<T> {
+    fn from_residual(residual: <Self as core::ops::Try>::Residual) -> Self {
+        match residual {
+            Message::PostToast(toast) => ToastResult::Err(toast),
+            _ => unreachable!(),
+        }
+    }
+}
+
+impl core::ops::FromResidual<Message> for Message {
+    fn from_residual(residual: Self) -> Self {
+        residual
+    }
+}
+
+impl<T> std::ops::Try for ToastResult<T> {
+    type Output = T;
+    type Residual = Message;
+
+    fn from_output(output: Self::Output) -> Self {
+        ToastResult::Ok(output)
+    }
+
+    fn branch(self) -> std::ops::ControlFlow<Self::Residual, Self::Output> {
+        match self {
+            ToastResult::Ok(v) => std::ops::ControlFlow::Continue(v),
+            ToastResult::Err(e) => std::ops::ControlFlow::Break(e.into()),
+        }
+    }
+}
+
 impl Toast {
     pub fn error(title: impl ToString, body: impl ToString) -> Self {
         Self {

@@ -13,9 +13,9 @@ use crate::{
     server::{ServerState, handler::AkarekoProtocolCommand, protocol::AkarekoProtocolResponse},
 };
 
-pub struct PostContent<I: IndexTag>(PhantomData<I>);
+pub struct SendContent<I: IndexTag>(PhantomData<I>);
 
-impl<I: IndexTag + 'static> AkarekoProtocolCommand for PostContent<I> {
+impl<I: IndexTag + 'static> AkarekoProtocolCommand for SendContent<I> {
     type RequestPayload = PostContentRequest<I>;
     type ResponsePayload = PostContentResponse;
     type ResponseData = ();

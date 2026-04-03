@@ -58,7 +58,7 @@ impl AddWhoModal {
 
         if let Some(user) = &self.user {
             return container(column![
-                row![text(format!("Name: {}", user.name().clone()))],
+                row![text(format!("Name: {}", user.name()))],
                 row![text(format!("Pub Key: {}", user.pub_key().to_base64()))],
                 row![text(format!("I2P Address: {}", user.address().to_string()))],
                 pick_list(TrustLevel::ALL, Some(user.trust()), |t| {

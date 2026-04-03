@@ -24,14 +24,15 @@ pub mod post {
 }
 pub mod relay {
     mod post_content;
-    pub use post_content::{PostContent, PostContentRequest, PostContentResponse};
+    pub use post_content::{PostContentRequest, PostContentResponse, SendContent};
 }
 pub mod users;
 
 /// Marker implemented by the handler macro
 pub trait CommandEnum: Byteable {}
 
-/// Should be implemented by each command, can be skipped by directly implementing [`AkarekoProtocolCommandHandler`]
+/// Should be implemented by each command, can be skipped by directly
+/// implementing [`AkarekoProtocolCommandHandler`]
 pub(super) trait AkarekoProtocolCommand: Sized {
     type RequestPayload: Byteable;
     type ResponsePayload: Byteable;

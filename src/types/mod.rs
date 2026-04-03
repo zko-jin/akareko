@@ -1,6 +1,8 @@
-use std::fmt::Display;
+use std::{fmt::Display, str::FromStr};
 
-use base64::{Engine as _, engine::general_purpose::STANDARD_NO_PAD};
+use base64::{
+    Engine as _, engine::general_purpose::STANDARD_NO_PAD, prelude::BASE64_URL_SAFE_NO_PAD,
+};
 #[cfg(feature = "diesel")]
 use diesel::{deserialize::FromSqlRow, expression::AsExpression};
 use serde::{Deserialize, Serialize};
@@ -32,6 +34,14 @@ pub use topic::Topic;
 )]
 // #[sql_type = "diesel::sql_types::Binary"]
 pub struct Hash(#[serde(with = "serde_bytes")] [u8; 64]);
+
+impl FromStr for Hash {
+    type Err = Base64Error;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        Hash::from_base64(s)
+    }
+}
 
 #[cfg(feature = "sqlite")]
 pub mod sqlite {
@@ -139,11 +149,11 @@ impl Hash {
     }
 
     pub fn as_base64(&self) -> String {
-        STANDARD_NO_PAD.encode(&self.0)
+        BASE64_URL_SAFE_NO_PAD.encode(&self.0)
     }
 
     pub fn from_base64(base64: &str) -> Result<Self, Base64Error> {
-        let bytes = STANDARD_NO_PAD.decode(base64)?;
+        let bytes = BASE64_URL_SAFE_NO_PAD.decode(base64)?;
 
         match bytes.try_into() {
             Ok(hash) => Ok(Hash(hash)),

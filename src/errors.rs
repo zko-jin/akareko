@@ -2,6 +2,8 @@
 
 use std::string::FromUtf8Error;
 
+use anawt::errors::LtrsError;
+
 use crate::server::protocol::AkarekoStatus;
 
 error_set::error_set! {
@@ -26,6 +28,12 @@ error_set::error_set! {
 
     I2PParseError := Base64Error
 
+    TorrentError := {
+        LtrsError(LtrsError),
+        Unknown,
+        NotInitialized
+    }
+
     YosemiteError := {
         YosemiteError(yosemite::Error)
     }
@@ -38,7 +46,7 @@ error_set::error_set! {
     //     DieselError(diesel::result::Error)
     // }
 
-    DatabaseError := {Unknown} || SurrealError /*|| DieselError */
+    DatabaseError := {Unknown, NotInitialized} || SurrealError /*|| DieselError */
 
     ServerError := { RelayNotEnabled } || YosemiteError || IoError
 

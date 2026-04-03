@@ -49,3 +49,7 @@ Offer a button to manually sync with a poster node on index pages
 Option to run a minimal node, only serving it's own content (better for scans that users want to follow)
 
 Option to add minimum timestamps so other peers can't just ask for too much content
+
+Auto download following content
+
+Server chat

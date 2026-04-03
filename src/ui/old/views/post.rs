@@ -94,11 +94,7 @@ impl PostView {
                 None => "Unknown",
             }));
 
-            column = column.push(
-                Row::new()
-                    .push(profile)
-                    .push(text(post.content.inner().clone())),
-            );
+            column = column.push(Row::new().push(profile).push(text(post.content.inner())));
         }
 
         column = column

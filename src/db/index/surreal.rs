@@ -1,6 +1,7 @@
+use const_format::formatcp;
 use fastbloom::BloomFilter;
 use surrealdb::{Surreal, engine::local::Db, types::RecordId};
-use surrealdb_types::{SurrealValue, Table, Value};
+use surrealdb_types::Value;
 
 use crate::{
     db::{
@@ -71,6 +72,24 @@ impl<'a> IndexRepository<'a> {
         transaction.commit().await?;
 
         Ok(())
+    }
+
+    pub async fn update_content_progress<T: IndexTag>(
+        &self,
+        signature: Signature,
+        progress: u32,
+    ) -> Result<Option<Content<T>>, DatabaseError> {
+        let query = format!("UPDATE $id SET progress = $progress");
+
+        let content: Option<Content<T>> = self
+            .db
+            .query(query)
+            .bind(("progress", progress))
+            .bind(("id", RecordId::new(T::CONTENT_TABLE, signature.as_base64())))
+            .await?
+            .take(0)?;
+
+        Ok(content)
     }
 
     pub async fn remove_content<T: IndexTag>(
@@ -190,11 +209,14 @@ impl<'a> IndexRepository<'a> {
 
         let mut query = self.db.query(query_str).bind(("index_hash", index_hash));
 
+        dbg!("Querying");
+
         if let Some(timestamp) = timestamp {
             query = query.bind(("timestamp", timestamp));
         }
 
         let results: Vec<Content<T>> = query.await?.take(0)?;
+        dbg!("Results");
 
         let contents = match filter {
             Some(filter) => results

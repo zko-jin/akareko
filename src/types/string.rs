@@ -28,7 +28,7 @@ macro_rules! impl_strings {
                     {
                         match value.kind() {
                             surrealdb::types::Kind::String => {
-                                [<String $bits>]::new(value.into_string()?).map_err(|e| {
+                                [<String $bits>]::new(value.into_string()?).map_err(|_| {
                                     surrealdb::Error::serialization(
                                         "String too long".to_string(),
                                         Some(surrealdb_types::SerializationError::Deserialization),

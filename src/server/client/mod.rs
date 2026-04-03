@@ -1,4 +1,3 @@
-use ed25519_dalek::KEYPAIR_LENGTH;
 use fastbloom::BloomFilter;
 use rclite::Arc;
 use tokio::sync::Mutex;
@@ -248,8 +247,8 @@ impl AkarekoClient {
     // ║                                 Exchange                                  ║
     // ╚===========================================================================╝
 
-    // pub async fn routine_exchange(&mut self, url: &I2PAddress) -> Result<(), ClientError> {
-    //     let mut stream = self.get_stream(url).await?;
+    // pub async fn routine_exchange(&mut self, url: &I2PAddress) -> Result<(),
+    // ClientError> {     let mut stream = self.get_stream(url).await?;
 
     //     let who = self.who_internal(&mut stream).await?;
 
@@ -278,12 +277,12 @@ impl AkarekoClient {
     //                 {
     //                     Ok(i) => match i {
     //                         Some(_) => {
-    //                             existing_indexes.insert(content.index_hash().clone());
-    //                         }
-    //                         None => {
-    //                             missing_indexes.push(content.index_hash().clone());
-    //                         }
-    //                     },
+    //                             
+    // existing_indexes.insert(content.index_hash().clone());                   
+    // }                         None => {
+    //                             
+    // missing_indexes.push(content.index_hash().clone());                      
+    // }                     },
     //                     Err(e) => {
     //                         error!("Failed to get index: {}", e);
     //                     }
@@ -335,9 +334,9 @@ impl AkarekoClient {
     //         }
     //         match content {
     //             TaggedContent::Manga(content) => {
-    //                 match self.repositories.index().await.add_content(content).await {
-    //                     Ok(_) => {}
-    //                     Err(e) => {
+    //                 match
+    // self.repositories.index().await.add_content(content).await {             
+    // Ok(_) => {}                     Err(e) => {
     //                         error!("Failed to add content: {}", e);
     //                     }
     //                 }

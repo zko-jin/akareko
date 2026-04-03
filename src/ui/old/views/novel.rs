@@ -1,8 +1,9 @@
 use anawt::{AnawtTorrentStatus, InfoHash, TorrentState};
 use iced::{
     Color, Element, Length, Subscription, Task,
-    widget::{Column, button, progress_bar, row, svg, text},
+    widget::{Column, Container, button, progress_bar, row, svg, text},
 };
+use iced_aw::DropDown;
 use tokio::sync::watch;
 use tracing::info;
 
@@ -16,9 +17,10 @@ use crate::{
     types::Topic,
     ui::{
         AppState,
-        components::toast::Toast,
+        components::{svg_button, toast::Toast},
         icons::{
-            BOOK_BOOKMARK_ICON, CHAT_ICON, CHECK_CIRCLE_ICON, DOWNLOAD_ICON, SEEN_ICON, UNSEEN_ICON,
+            BOOK_BOOKMARK_ICON, CHAT_ICON, CHECK_CIRCLE_ICON, DOTS_THREE_VERTICAL_ICON,
+            DOWNLOAD_ICON, SEEN_ICON, UNSEEN_ICON,
         },
         message::Message,
         style,
@@ -36,6 +38,7 @@ pub struct MangaView {
     follow: bool,
     manga: Index<MangaTag>,
     chapters: Vec<Content<MangaTag>>,
+    active_dropdown: Option<(usize, usize)>,
     pub torrents: Vec<Option<watch::Receiver<AnawtTorrentStatus>>>,
 }
 
@@ -50,6 +53,7 @@ pub enum MangaMessage {
     LoadedFollow(bool),
     ExcludeChapter(usize),
     ToggleFollow,
+    SetDropdown(Option<(usize, usize)>),
 }
 
 impl From<MangaMessage> for Message {
@@ -64,6 +68,7 @@ impl MangaView {
             follow: false,
             manga: novel,
             chapters: vec![],
+            active_dropdown: None,
             torrents: Vec::new(),
         }
     }
@@ -153,16 +158,7 @@ impl MangaView {
                         .into(),
                     )
                     .into(),
-                    ContentState::Ready => button(
-                        svg(svg::Handle::from_memory(CHECK_CIRCLE_ICON))
-                            .height(24.0)
-                            .width(24.0)
-                            .style(|_, _| svg::Style {
-                                color: Some(Color::WHITE),
-                            }),
-                    )
-                    .style(style::icon_button)
-                    .into(),
+                    ContentState::Ready => svg_button(CHECK_CIRCLE_ICON.clone()).into(),
                 };
 
                 column = column.push(row![
@@ -189,7 +185,7 @@ impl MangaView {
                     download_element,
                     if e.progress < 1.0 {
                         button(
-                            svg(svg::Handle::from_memory(UNSEEN_ICON))
+                            svg(svg::Handle::from_memory(UNSEEN_ICON.clone()))
                                 .height(Length::Fixed(24.0))
                                 .width(Length::Fixed(24.0))
                                 .style(|_, _| svg::Style {
@@ -221,7 +217,21 @@ impl MangaView {
                     .style(style::icon_button)
                     .on_press(Message::ChangeView(View::Post(PostView::new(
                         Topic::from_entry(&self.manga, e.enumeration)
-                    ))))
+                    )))),
+                    DropDown::new(
+                        svg_button(DOTS_THREE_VERTICAL_ICON.clone())
+                            .on_press(MangaMessage::SetDropdown(Some((i, j))).into()),
+                        Container::new(row![
+                            button(text("Exclude"))
+                                .on_press(MangaMessage::ExcludeChapter(i).into())
+                        ]),
+                        if let Some((k, l)) = &self.active_dropdown {
+                            if *k == i && *l == j { true } else { false }
+                        } else {
+                            false
+                        }
+                    )
+                    .on_dismiss(MangaMessage::SetDropdown(None).into())
                 ]);
             }
         }
@@ -232,6 +242,9 @@ impl MangaView {
     pub fn update(m: MangaMessage, state: &mut AppState) -> Task<Message> {
         if let View::Novel(v) = &mut state.view {
             match m {
+                MangaMessage::SetDropdown(i) => {
+                    v.active_dropdown = i;
+                }
                 MangaMessage::ContentLoaded(chapters) => {
                     v.torrents = vec![None; chapters.len()];
                     v.chapters = chapters;
@@ -305,7 +318,8 @@ impl MangaView {
                                 let info_hash = match InfoHash::from_magnet(&chapter.magnet_link.0)
                                 {
                                     Ok(info_hash) => info_hash,
-                                    Err(_) => continue, // TODO: Invalid magnet, issue chapter deletion
+                                    Err(_) => continue, /* TODO: Invalid magnet, issue chapter
+                                                         * deletion */
                                 };
                                 let rx = torrent_client.subscribe_torrent(info_hash).await;
                                 watchers[i] = rx;

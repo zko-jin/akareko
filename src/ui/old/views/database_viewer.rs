@@ -13,7 +13,7 @@ use crate::{
     db::event::{Event, get_paginated_events},
     ui::{
         AppState,
-        components::toast::{Toast, ToastType},
+        components::toast::{IntoToastResult, Toast, ToastResult},
         message::Message,
         views::{View, ViewMessage},
     },
@@ -182,8 +182,9 @@ impl DatabaseViewerView {
                             };
 
                             return Task::future(async move {
-                                let (events, total_pages) =
-                                    get_paginated_events(1, 50, &repo.db).await.unwrap();
+                                let (events, total_pages) = get_paginated_events(1, 50, &repo.db)
+                                    .await
+                                    .to_toast("Error loading events")?;
 
                                 DatabaseViewerMessage::LoadEvents {
                                     events,

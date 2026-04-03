@@ -1,4 +1,4 @@
-use std::fmt::Debug;
+use std::{fmt::Debug, hash::Hash};
 use surrealdb_types::SurrealValue;
 
 use crate::{
@@ -8,7 +8,7 @@ use crate::{
 
 // ==================== End Imports ====================
 
-pub trait IndexTag: Send + Clone + Debug {
+pub trait IndexTag: Send + Clone + Debug + PartialEq + Eq + Hash + 'static {
     const TAG: &'static str; // Acts like table name
     const CONTENT_TABLE: &'static str;
     type ExtraMetadata: Send + Clone + Debug + ToBytes + Byteable + SurrealValue;
@@ -20,7 +20,7 @@ pub trait IndexTag: Send + Clone + Debug {
 // ==============================================================================
 //                                 MangaTag
 // ==============================================================================
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct MangaTag;
 
 impl IndexTag for MangaTag {
@@ -55,7 +55,7 @@ impl ToBytes for MangaChapter {
 // ==============================================================================
 //                                    NoTag
 // ==============================================================================
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct NoTag;
 impl IndexTag for NoTag {
     const TAG: &'static str = "";

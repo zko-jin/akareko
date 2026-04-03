@@ -134,8 +134,8 @@ impl AkarekoConfig {
         (b32_from_pub_b64(&destination).unwrap(), private_key)
     }
 
-    /// can't fail, if the config is missing or is invalid it will just be created
-    /// anyways
+    /// can't fail, if the config is missing or is invalid it will just be
+    /// created anyways
     pub async fn load() -> AkarekoConfig {
         let mut should_save = false;
 

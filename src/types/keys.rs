@@ -1,4 +1,5 @@
 use std::fmt::{Display, Formatter};
+use std::str::FromStr;
 
 use base64::prelude::BASE64_URL_SAFE_NO_PAD;
 use base64::{Engine as _, engine::general_purpose::STANDARD_NO_PAD};
@@ -147,6 +148,20 @@ pub mod sqlite {
     }
 }
 
+impl Display for Signature {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.as_base64())
+    }
+}
+
+impl FromStr for Signature {
+    type Err = Base64Error;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        Self::from_base64(s)
+    }
+}
+
 impl Signature {
     pub fn empty() -> Self {
         Signature([0u8; 64])
@@ -157,15 +172,11 @@ impl Signature {
     }
 
     pub fn as_base64(&self) -> String {
-        STANDARD_NO_PAD.encode(&self.0)
-    }
-
-    pub fn as_base64_url(&self) -> String {
         BASE64_URL_SAFE_NO_PAD.encode(&self.0)
     }
 
     pub fn from_base64(base64: &str) -> Result<Self, Base64Error> {
-        let bytes = STANDARD_NO_PAD.decode(base64)?;
+        let bytes = BASE64_URL_SAFE_NO_PAD.decode(base64)?;
 
         match bytes.try_into() {
             Ok(hash) => Ok(Signature(hash)),
