@@ -24,7 +24,7 @@ impl<I: IndexTag> QueryCapability for FetchIndexes<I> {
     type Keys = ();
 
     async fn run(&self, _keys: &Self::Keys) -> Result<Self::Ok, Self::Err> {
-        let radio = try_consume_context::<RadioStation<AppState, AppChannel>>();
+        let radio = try_consume_root_context::<RadioStation<AppState, AppChannel>>();
         let Some(radio) = radio else {
             return Err(DatabaseError::NotInitialized);
         };

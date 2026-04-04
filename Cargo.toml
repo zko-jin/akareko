@@ -52,8 +52,8 @@ byteable-derive = { path = "./byteable-derive" }
 cxx = "1.0.186"
 bitflags = "2.9.4"
 anawt = { git = "https://github.com/pliduino/anawt.git", branch = "develop", optional = true }
-iced = { version = "0.14.0", features = ["tokio", "image", "svg", "sipper"], optional = true }
-iced_aw = { version = "0.13.0", optional = true, features = ["drop_down"] }
+# iced = { version = "0.14.0", features = ["tokio", "image", "svg", "sipper"], optional = true }
+# iced_aw = { version = "0.13.0", optional = true, features = ["drop_down"] }
 bytes = "1.10.1"
 error_set = "0.9.0"
 rclite = "0.3.0"
@@ -87,11 +87,12 @@ harness = false
 
 [features]
 default = ["surrealdb", "bin"]
-bin = ["dep:iced", "dep:iced_aw", "dep:anawt"]
+bin = ["dep:anawt"]
 lto = ["anawt/lto"]
 surrealdb = []
 sqlite = ["diesel"]
 diesel = []
+devtools = ["freya/devtools"]
 
 [profile.release]
 lto = "fat"

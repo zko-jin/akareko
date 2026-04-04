@@ -18,7 +18,7 @@ impl<I: IndexTag + 'static> QueryCapability for FetchContents<I> {
     type Keys = Hash;
 
     async fn run(&self, keys: &Self::Keys) -> Result<Self::Ok, Self::Err> {
-        let radio = try_consume_context::<RadioStation<AppState, AppChannel>>();
+        let radio = try_consume_root_context::<RadioStation<AppState, AppChannel>>();
         let Some(radio) = radio else {
             return Err(DatabaseError::NotInitialized);
         };

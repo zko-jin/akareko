@@ -2,13 +2,9 @@ use fastbloom::BloomFilter;
 
 use crate::{
     db::{
-        index::{
-            Index,
-            tags::{IndexTag, MangaTag, NoTag},
-        },
+        index::{Index, tags::IndexTag},
         user::I2PAddress,
     },
-    errors::{DecodeError, EncodeError},
     server::{ServerState, handler::AkarekoProtocolCommand, protocol::AkarekoProtocolResponse},
     types::Timestamp,
 };

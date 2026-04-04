@@ -231,7 +231,8 @@ impl ImageViewerView {
                                     }
                                 }
 
-                                // Add priority system so files near the current page are loaded first
+                                // Add priority system so files near the current page are loaded
+                                // first
                                 for i in 0..total_images {
                                     let mut f = zip.reader_with_entry(i).await.unwrap();
                                     let mut buffer = vec![];

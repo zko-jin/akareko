@@ -1,4 +1,3 @@
-use const_format::formatcp;
 use fastbloom::BloomFilter;
 use surrealdb::{Surreal, engine::local::Db, types::RecordId};
 use surrealdb_types::Value;

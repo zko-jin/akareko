@@ -1,8 +1,6 @@
 use std::{fmt::Display, str::FromStr};
 
-use base64::{
-    Engine as _, engine::general_purpose::STANDARD_NO_PAD, prelude::BASE64_URL_SAFE_NO_PAD,
-};
+use base64::{Engine as _, prelude::BASE64_URL_SAFE_NO_PAD};
 #[cfg(feature = "diesel")]
 use diesel::{deserialize::FromSqlRow, expression::AsExpression};
 use serde::{Deserialize, Serialize};

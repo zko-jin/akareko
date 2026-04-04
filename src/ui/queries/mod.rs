@@ -7,10 +7,7 @@ use freya::{
 };
 
 use crate::{
-    db::{
-        Repositories,
-        index::{Index, content::Content, tags::IndexTag},
-    },
+    db::index::{Index, content::Content, tags::IndexTag},
     errors::{DatabaseError, IoError},
     types::Hash,
     ui::{AppChannel, AppState, ResourceState},
@@ -60,7 +57,7 @@ impl<I: IndexTag + 'static> QueryCapability for FetchIndex<I> {
     type Keys = Hash;
 
     async fn run(&self, keys: &Self::Keys) -> Result<Self::Ok, Self::Err> {
-        let radio = try_consume_context::<RadioStation<AppState, AppChannel>>();
+        let radio = try_consume_root_context::<RadioStation<AppState, AppChannel>>();
         let Some(radio) = radio else {
             return Err(DatabaseError::NotInitialized);
         };
@@ -105,7 +102,7 @@ impl<I: IndexTag + 'static> MutationCapability for AddIndex<I> {
     type Keys = Index<I>;
 
     async fn run(&self, keys: &Self::Keys) -> Result<Self::Ok, Self::Err> {
-        let radio = try_consume_context::<RadioStation<AppState, AppChannel>>();
+        let radio = try_consume_root_context::<RadioStation<AppState, AppChannel>>();
         let Some(radio) = radio else {
             return Err(DatabaseError::NotInitialized);
         };
@@ -157,7 +154,7 @@ impl<I: IndexTag + 'static> MutationCapability for AddIndexContent<I> {
     type Keys = Content<I>;
 
     async fn run(&self, keys: &Self::Keys) -> Result<Self::Ok, Self::Err> {
-        let radio = try_consume_context::<RadioStation<AppState, AppChannel>>();
+        let radio = try_consume_root_context::<RadioStation<AppState, AppChannel>>();
         let Some(radio) = radio else {
             return Err(DatabaseError::NotInitialized);
         };

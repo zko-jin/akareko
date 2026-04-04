@@ -1,11 +1,7 @@
-use surrealdb_core::api::path;
 use surrealdb_types::SurrealValue;
-use tokio::io::{AsyncRead, AsyncWrite};
 
 use crate::{
     db::{Magnet, ToBytes, index::tags::IndexTag},
-    errors::{DecodeError, EncodeError},
-    helpers::Byteable,
     types::{Hash, PrivateKey, PublicKey, Signature, Timestamp},
 };
 

@@ -1,7 +1,7 @@
 use tokio::io::{AsyncRead, AsyncReadExt, AsyncWrite, AsyncWriteExt};
 
 use crate::{
-    errors::{ClientError, DatabaseError, DecodeError, EncodeError},
+    errors::{ClientError, DecodeError, EncodeError},
     helpers::Byteable,
     server::handler::{AkarekoProtocolCommand, AkarekoProtocolCommandMetadata},
 };

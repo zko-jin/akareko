@@ -9,7 +9,7 @@ use crate::{
     db::index::{Index, tags::MangaTag},
     ui::{
         Route, RouteContext,
-        components::ContentEntry,
+        components::{AkLayers, ContentEntry},
         icons::PLUS_ICON,
         queries::{FetchContents, UpdateContentProgress},
     },
@@ -40,6 +40,7 @@ impl Component for Manga {
         let top = rect()
             .horizontal()
             .child(ImageViewer::new(cover_holder).width(Size::px(400.)))
+            .child(title)
             .child(
                 Button::new()
                     .child(svg(PLUS_ICON))
@@ -67,6 +68,6 @@ impl Component for Manga {
             }
         };
 
-        rect().child(title).child(top).child(chapters)
+        rect().child(top).child(chapters)
     }
 }

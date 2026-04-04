@@ -1,28 +1,21 @@
-use anawt::{TorrentClient, options::AnawtOptions};
+use anawt::TorrentClient;
 use freya::{
     prelude::*,
-    query::{
-        MutationCapability, QueriesStorage, Query, QueryCapability, QueryStateData, use_query,
-    },
-    radio::{RadioChannel, RadioStation, use_init_radio_station, use_radio, use_share_radio},
-    router::{Outlet, Routable, Router, RouterConfig, RouterContext, use_share_router},
+    radio::{RadioChannel, RadioStation, use_radio, use_share_radio},
 };
 
 use crate::{
     config::AkarekoConfig,
     db::{
         Repositories,
-        index::{
-            Index,
-            tags::{IndexTag, MangaTag},
-        },
+        index::{Index, tags::IndexTag},
     },
-    errors::{DatabaseError, SurrealError},
-    server::{AkarekoServer, client::pool::ClientPool},
-    types::Hash,
+    server::client::pool::ClientPool,
     ui::{
+        components::AkLayers,
         icons::{ARROW_LEFT_ICON, ARROW_RIGHT_ICON},
         router::RouteComponent,
+        theme::CUSTOM_THEME,
     },
 };
 
@@ -30,6 +23,7 @@ mod components;
 mod icons;
 mod queries;
 mod router;
+mod theme;
 pub use router::{Route, RouteContext};
 
 #[derive(Clone)]
@@ -89,6 +83,17 @@ pub enum ResourceState<T, E> {
     Loaded(T),
 }
 
+impl<T, E> ResourceState<T, E> {
+    pub fn unwrap_ref(&self) -> &T {
+        match self {
+            ResourceState::Pending => panic!("ResourceState::Pending"),
+            ResourceState::Error(_) => panic!("ResourceState::Error"),
+            ResourceState::Loading => panic!("ResourceState::Loading"),
+            ResourceState::Loaded(t) => t,
+        }
+    }
+}
+
 impl<T: Clone, E: Clone> Clone for ResourceState<T, E> {
     fn clone(&self) -> Self {
         match self {
@@ -102,7 +107,7 @@ impl<T: Clone, E: Clone> Clone for ResourceState<T, E> {
 
 pub struct AppState {
     pub config: ResourceState<AkarekoConfig, ()>,
-    pub repositories: ResourceState<Repositories, SurrealError>,
+    pub repositories: ResourceState<Repositories, ()>,
     pub torrent_client: ResourceState<TorrentClient, ()>,
     pub server: ResourceState<(), ()>,
     pub client: ResourceState<ClientPool, ()>,
@@ -137,7 +142,13 @@ impl App for AkarekoApp {
     fn render(&self) -> impl IntoElement {
         use_share_radio(move || self.radio_station);
         use_provide_context(|| self.router);
-        use_provide_context(|| self.radio_station);
+        // use_provide_context(|| self.radio_station);
+        use_hook(|| {
+            let ctx = self.radio_station;
+            provide_context_for_scope_id(ctx.clone(), ScopeId::ROOT);
+            ctx
+        });
+        use_init_theme(|| CUSTOM_THEME);
         Layout
     }
 }
@@ -195,12 +206,12 @@ impl Component for Layout {
                                         RouteContext::get().go_back();
                                     }),
                             )
-                            .child(
-                                Button::new().child(svg(ARROW_RIGHT_ICON)), /* .enabled(RouterContext::get().can_go_forward())
-                                                                             * .on_press(|_| {
-                                                                             *     RouterContext::get().go_forward();
-                                                                             * }), */
-                            ),
+                            // .child(
+                            //     Button::new().child(svg(ARROW_RIGHT_ICON)), /* .enabled(RouterContext::get().can_go_forward())
+                            //                                                  * .on_press(|_| {
+                            //                                                  *     RouterContext::get().go_forward();
+                            //                                                  * }), */
+                            // ),
                     )
                     .child(status),
             )
@@ -209,6 +220,7 @@ impl Component for Layout {
                     .child(RouteComponent)
                     .expanded()
                     .margin((5.0, 5.0, 5.0, 0.0))
+                    .overflow(Overflow::Clip)
                     .corner_radius(10.0)
                     .background(Color::WHITE),
             )

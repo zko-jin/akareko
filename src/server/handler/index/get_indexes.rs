@@ -1,9 +1,6 @@
 use crate::{
     db::{
-        index::{
-            Index,
-            tags::{IndexTag, MangaTag, NoTag},
-        },
+        index::{Index, tags::IndexTag},
         user::I2PAddress,
     },
     server::{ServerState, handler::AkarekoProtocolCommand, protocol::AkarekoProtocolResponse},

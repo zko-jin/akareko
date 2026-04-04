@@ -1,5 +1,7 @@
 #![allow(dead_code)]
 
+use std::path::PathBuf;
+
 use anawt::TorrentClient;
 use anawt::options::AnawtOptions;
 use clap::Parser;
@@ -13,9 +15,11 @@ use freya::tray::menu::MenuEvent;
 use freya::tray::menu::MenuItem;
 use futures::SinkExt;
 use futures::channel::mpsc;
+use futures::executor::block_on;
 use rclite::Arc;
 use tokio::sync::RwLock;
 use tokio::task::JoinHandle;
+use tracing::error;
 use tracing::info;
 use tracing_subscriber::EnvFilter;
 use tracing_subscriber::Layer;
@@ -102,21 +106,28 @@ fn main() -> Result<(), ()> {
             .build()
             .unwrap()
     };
-    let tray_handler = |ev, mut ctx: RendererContext| match ev {
-        TrayEvent::Menu(MenuEvent { id }) if id == "open" => {
-            // ctx.launch_window(WindowConfig::new(app).with_size(500., 450.));
-        }
-        TrayEvent::Menu(MenuEvent { id }) if id == "quit" => {
-            ctx.exit();
-        }
-        _ => {}
-    };
 
     let mut radio_station = RadioStation::<AppState, AppChannel>::create_global(AppState::new());
     // let router = RouterContext::create_global::<ui::Route>(
     //     RouterConfig::default().with_initial_path(Route::Home),
     // );
     let router = RouteContext::create_global();
+
+    let tray_handler = move |ev, mut ctx: RendererContext| match ev {
+        TrayEvent::Menu(MenuEvent { id }) if id == "open" => {
+            // ctx.launch_window(WindowConfig::new(app).with_size(500., 450.));
+        }
+        TrayEvent::Menu(MenuEvent { id }) if id == "quit" => {
+            match &radio_station.peek().torrent_client {
+                ui::ResourceState::Loaded(client) => {
+                    let _ = block_on(client.save(PathBuf::from("./data/torrents")));
+                }
+                _ => {}
+            };
+            ctx.exit();
+        }
+        _ => {}
+    };
 
     enum Event {
         ReloadConfig,
@@ -203,6 +214,12 @@ fn main() -> Result<(), ()> {
             .write_channel(AppChannel::TorrentClient)
             .torrent_client = ui::ResourceState::Loading;
         let torrent_client = TorrentClient::create(AnawtOptions::new());
+        match torrent_client.load("./data/torrents".into()).await {
+            Ok(_) => {}
+            Err(e) => {
+                error!("Failed to load torrents: {}", e);
+            }
+        }
         radio_station
             .write_channel(AppChannel::TorrentClient)
             .torrent_client = ui::ResourceState::Loaded(torrent_client);

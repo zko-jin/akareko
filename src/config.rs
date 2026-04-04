@@ -192,7 +192,15 @@ impl AkarekoConfig {
         &self.image_viewer_preferences
     }
 
+    pub fn zoom(&self) -> i16 {
+        self.image_viewer_preferences.zoom
+    }
+
     pub fn set_zoom(&mut self, zoom: i16) {
+        if zoom < 1 {
+            self.image_viewer_preferences.zoom = 1;
+            return;
+        }
         self.image_viewer_preferences.zoom = zoom;
     }
 

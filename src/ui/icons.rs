@@ -1,4 +1,3 @@
-use iced::widget::svg;
 use std::sync::LazyLock;
 
 macro_rules! icon {
@@ -7,8 +6,8 @@ macro_rules! icon {
     };
 }
 
-icon!(SEEN_ICON, "../../assets/icons/eye-slash.svg");
-icon!(UNSEEN_ICON, "../../assets/icons/eye.svg");
+icon!(EYE_SLASH_ICON, "../../assets/icons/eye-slash.svg");
+icon!(EYE_ICON, "../../assets/icons/eye.svg");
 icon!(CHAT_ICON, "../../assets/icons/chat.svg");
 icon!(DOWNLOAD_ICON, "../../assets/icons/download-simple.svg");
 icon!(CHECK_CIRCLE_ICON, "../../assets/icons/check-circle.svg");

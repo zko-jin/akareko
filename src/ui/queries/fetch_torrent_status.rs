@@ -1,9 +1,5 @@
 use anawt::{AnawtTorrentStatus, InfoHash};
-use freya::{
-    prelude::{try_consume_context, use_provide_context, use_try_consume},
-    query::*,
-    radio::RadioStation,
-};
+use freya::{prelude::*, query::*, radio::RadioStation};
 
 use crate::{
     errors::TorrentError,
@@ -19,8 +15,7 @@ impl QueryCapability for FetchTorrentStatus {
     type Keys = InfoHash;
 
     async fn run(&self, keys: &Self::Keys) -> Result<Self::Ok, Self::Err> {
-        let radio = try_consume_context::<RadioStation<AppState, AppChannel>>();
-        dbg!(radio.is_some());
+        let radio = try_consume_root_context::<RadioStation<AppState, AppChannel>>();
         let Some(radio) = radio else {
             return Err(TorrentError::NotInitialized);
         };

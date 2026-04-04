@@ -1,13 +1,8 @@
 use std::marker::PhantomData;
 
-use fastbloom::BloomFilter;
-
 use crate::{
     db::{
-        index::{
-            content::Content,
-            tags::{IndexTag, MangaTag},
-        },
+        index::{content::Content, tags::IndexTag},
         user::I2PAddress,
     },
     server::{ServerState, handler::AkarekoProtocolCommand, protocol::AkarekoProtocolResponse},

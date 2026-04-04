@@ -1,5 +1,5 @@
 use serde::{
-    Deserialize, Deserializer, Serialize, Serializer,
+    Deserializer, Serialize, Serializer,
     de::{DeserializeOwned, DeserializeSeed, SeqAccess},
     ser::{
         SerializeMap, SerializeSeq, SerializeStruct, SerializeStructVariant, SerializeTuple,

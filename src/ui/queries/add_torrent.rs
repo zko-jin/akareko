@@ -1,17 +1,10 @@
 use anawt::InfoHash;
-use freya::{prelude::try_consume_context, query::*, radio::RadioStation};
+use freya::{prelude::*, query::*, radio::RadioStation};
 
 use crate::{
-    db::{
-        Magnet,
-        index::{content::Content, tags::IndexTag},
-    },
-    errors::{DatabaseError, TorrentError},
-    types::Signature,
-    ui::{
-        AppChannel, AppState, ResourceState,
-        queries::{FetchContents, FetchTorrentStatus},
-    },
+    db::Magnet,
+    errors::TorrentError,
+    ui::{AppChannel, AppState, ResourceState, queries::FetchTorrentStatus},
 };
 
 #[derive(PartialEq, Eq, Clone, Hash)]
@@ -23,22 +16,16 @@ impl MutationCapability for AddTorrent {
     type Keys = (Magnet, String /* path */);
 
     async fn run(&self, keys: &Self::Keys) -> Result<Self::Ok, Self::Err> {
-        println!("TRYING HARD");
-
-        let radio = try_consume_context::<RadioStation<AppState, AppChannel>>();
+        let radio = try_consume_root_context::<RadioStation<AppState, AppChannel>>();
         let Some(radio) = radio else {
             return Err(TorrentError::NotInitialized);
         };
 
         match &radio.read().torrent_client {
-            ResourceState::Loaded(c) => {
-                let x = c
-                    .add_magnet(&keys.0.0, &keys.1)
-                    .await
-                    .map_err(|_| TorrentError::Unknown);
-                println!("ADDED ");
-                x
-            }
+            ResourceState::Loaded(c) => c
+                .add_magnet(&keys.0.0, &keys.1)
+                .await
+                .map_err(|_| TorrentError::Unknown),
             _ => Err(TorrentError::NotInitialized),
         }
     }
