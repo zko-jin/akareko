@@ -30,23 +30,16 @@
           libappindicator-gtk3
           libayatana-appindicator
           wayland
+          boost
         ];
+
+        libPaths = pkgs.lib.makeLibraryPath dlopenLibraries;
       in
       {
         devShell = pkgs.mkShell {
-          packages = with pkgs; [
-            clang
-            clang-tools
-            rust-analyzer
-            boost
-            boost-build
-            # diesel-cli
-          ];
-
           buildInputs = with pkgs; [
             openssl
-            rust-bin.nightly.latest.default
-            sqlite
+            # sqlite
             glib
             freetype
             fontconfig
@@ -58,17 +51,27 @@
           ];
 
           nativeBuildInputs = with pkgs; [
+            rust-bin.nightly.latest.default
             pkg-config
             libxkbcommon
             makeWrapper
             libGL
             wayland
             xdotool
+
+            clang
+            clang-tools
+            boost
+            rust-analyzer
+            boost-build
+            dioxus-cli
+            lld
           ];
 
           RUST_SRC_PATH = pkgs.rustPlatform.rustLibSrc;
 
-          env.RUSTFLAGS = "-C link-arg=-Wl,-rpath,${pkgs.lib.makeLibraryPath dlopenLibraries}";
+          env.RUSTFLAGS = "-C link-arg=-Wl,-rpath,${libPaths}";
+          env.LD_LIBRARY_PATH = libPaths;
         };
       }
     );

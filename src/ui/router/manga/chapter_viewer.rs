@@ -20,86 +20,6 @@ use crate::{
     ui::{AppChannel, ResourceState, components::AkLayers},
 };
 
-fn image_loader(path: PathBuf, mut images: State<Vec<Option<ImageHolder>>>) -> TaskHandle {
-    let chapter_loader = use_hook(move || {
-        spawn(async move {
-            if !path.exists() {
-                error!("Path does not exist");
-                return;
-            }
-
-            if path.is_dir() {
-                let mut dir = tokio::fs::read_dir(&path).await.unwrap();
-                let mut paths = Vec::new();
-                while let Ok(entry) = dir.next_entry().await {
-                    let entry = entry.unwrap();
-                    if entry.file_type().await.unwrap().is_file() {
-                        paths.push(entry.path());
-                    }
-                }
-
-                *images.write() = vec![None; paths.len()];
-
-                for (i, path) in paths.iter().enumerate() {
-                    let bytes: Bytes = tokio::fs::read(path).await.unwrap().into();
-                    let (image, bytes) = blocking::unblock(move || {
-                        let image = skia_safe::Image::from_encoded(unsafe {
-                            skia_safe::Data::new_bytes(&bytes)
-                        })
-                        .unwrap();
-                        (image, bytes)
-                    })
-                    .await;
-
-                    images.write()[i] = Some(ImageHolder {
-                        image: Rc::new(RefCell::new(image)),
-                        bytes,
-                    });
-                }
-            }
-
-            if let Some(extension) = path.extension() {
-                if extension == "cbz" {
-                    let mut file = BufReader::new(File::open(path).await.unwrap());
-                    let mut zip = ZipFileReader::with_tokio(&mut file).await.unwrap();
-
-                    // TODO: Check how many actual images and ignore other files
-                    let total_images = zip.file().entries().len();
-
-                    *images.write() = vec![None; total_images];
-
-                    // Add priority system so files near the current
-                    // page are loaded first
-                    for i in 0..total_images {
-                        let mut f = zip.reader_with_entry(i).await.unwrap();
-                        let mut buffer = vec![];
-                        f.read_to_end(&mut buffer).await.unwrap();
-                        let (image, bytes) = blocking::unblock(move || {
-                            let image = skia_safe::Image::from_encoded(unsafe {
-                                skia_safe::Data::new_bytes(&buffer)
-                            })
-                            .unwrap();
-                            (image, buffer.into())
-                        })
-                        .await;
-
-                        images.write()[i] = Some(ImageHolder {
-                            image: Rc::new(RefCell::new(image)),
-                            bytes,
-                        });
-                    }
-                }
-            }
-        })
-    });
-
-    use_drop(move || {
-        chapter_loader.try_cancel();
-    });
-
-    chapter_loader
-}
-
 #[derive(PartialEq)]
 pub struct ChapterViewer {
     pub content: Content<MangaTag>,
@@ -273,4 +193,84 @@ impl Component for ChapterViewer {
             .child(click_areas)
             .on_global_key_down(on_key_down)
     }
+}
+
+fn image_loader(path: PathBuf, mut images: State<Vec<Option<ImageHolder>>>) -> TaskHandle {
+    let chapter_loader = use_hook(move || {
+        spawn(async move {
+            if !path.exists() {
+                error!("Path does not exist");
+                return;
+            }
+
+            if path.is_dir() {
+                let mut dir = tokio::fs::read_dir(&path).await.unwrap();
+                let mut paths = Vec::new();
+                while let Ok(entry) = dir.next_entry().await {
+                    let entry = entry.unwrap();
+                    if entry.file_type().await.unwrap().is_file() {
+                        paths.push(entry.path());
+                    }
+                }
+
+                *images.write() = vec![None; paths.len()];
+
+                for (i, path) in paths.iter().enumerate() {
+                    let bytes: Bytes = tokio::fs::read(path).await.unwrap().into();
+                    let (image, bytes) = blocking::unblock(move || {
+                        let image = skia_safe::Image::from_encoded(unsafe {
+                            skia_safe::Data::new_bytes(&bytes)
+                        })
+                        .unwrap();
+                        (image, bytes)
+                    })
+                    .await;
+
+                    images.write()[i] = Some(ImageHolder {
+                        image: Rc::new(RefCell::new(image)),
+                        bytes,
+                    });
+                }
+            }
+
+            if let Some(extension) = path.extension() {
+                if extension == "cbz" {
+                    let mut file = BufReader::new(File::open(path).await.unwrap());
+                    let mut zip = ZipFileReader::with_tokio(&mut file).await.unwrap();
+
+                    // TODO: Check how many actual images and ignore other files
+                    let total_images = zip.file().entries().len();
+
+                    *images.write() = vec![None; total_images];
+
+                    // Add priority system so files near the current
+                    // page are loaded first
+                    for i in 0..total_images {
+                        let mut f = zip.reader_with_entry(i).await.unwrap();
+                        let mut buffer = vec![];
+                        f.read_to_end(&mut buffer).await.unwrap();
+                        let (image, bytes) = blocking::unblock(move || {
+                            let image = skia_safe::Image::from_encoded(unsafe {
+                                skia_safe::Data::new_bytes(&buffer)
+                            })
+                            .unwrap();
+                            (image, buffer.into())
+                        })
+                        .await;
+
+                        images.write()[i] = Some(ImageHolder {
+                            image: Rc::new(RefCell::new(image)),
+                            bytes,
+                        });
+                    }
+                }
+            }
+        })
+    });
+
+    use_drop(move || {
+        chapter_loader.try_cancel();
+    });
+
+    chapter_loader
 }

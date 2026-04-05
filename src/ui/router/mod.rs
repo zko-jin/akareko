@@ -45,12 +45,29 @@ pub enum Route {
     ChapterViewer { content: Content<MangaTag> },
 }
 
+impl Route {
+    pub fn name(&self) -> &'static str {
+        match self {
+            Route::Home => "Home",
+            Route::MangaList => "Mangas",
+            Route::Manga { index } => "",
+            Route::AddManga => "Add Manga",
+            Route::AddMangaChapter { index } => "",
+            Route::ChapterViewer { content } => "",
+        }
+    }
+}
+
 pub struct RouteState {
     route: Route,
     history: LiFo<Route, 10>,
 }
 
 impl RouteState {
+    pub fn route(&self) -> &Route {
+        &self.route
+    }
+
     fn change_route(&mut self, route: Route) {
         let old = std::mem::replace(&mut self.route, route);
         self.history.push(old);
@@ -89,6 +106,10 @@ impl RouteContext {
 
     pub fn can_go_back(&self) -> bool {
         self.state.read().history.can_pop()
+    }
+
+    pub fn state(&self) -> ReadRef<'_, RouteState> {
+        self.state.read()
     }
 }
 

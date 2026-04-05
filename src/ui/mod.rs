@@ -12,19 +12,23 @@ use crate::{
     },
     server::client::pool::ClientPool,
     ui::{
-        components::AkLayers,
+        components::{AkLayers, layout_button},
         icons::{ARROW_LEFT_ICON, ARROW_RIGHT_ICON},
         router::RouteComponent,
         theme::CUSTOM_THEME,
     },
 };
 
+pub mod app_manager;
 mod components;
 mod icons;
 mod queries;
 mod router;
 mod theme;
 pub use router::{Route, RouteContext};
+
+const DEFAULT_PAGE_PADDING: Gaps = Gaps::new(20., 50., 0., 50.);
+const DEFAULT_CORNER_RADIUS: f32 = 10.;
 
 #[derive(Clone)]
 struct IndexComponent<I: IndexTag + 'static> {
@@ -170,19 +174,27 @@ impl Component for Layout {
 
         let status = rect().height(Size::Fill).children([
             rect()
+                .horizontal()
                 .child("Repository")
+                .child(rect().width(Size::px(15.)))
                 .child(render_status(&radio.read().repositories))
                 .into(),
             rect()
+                .horizontal()
                 .child("Torrent Client")
+                .child(rect().width(Size::px(15.)))
                 .child(render_status(&radio.read().torrent_client))
                 .into(),
             rect()
+                .horizontal()
                 .child("Server")
+                .child(rect().width(Size::px(15.)))
                 .child(render_status(&radio.read().server))
                 .into(),
             rect()
+                .horizontal()
                 .child("Client")
+                .child(rect().width(Size::px(15.)))
                 .child(render_status(&radio.read().client))
                 .into(),
         ]);
@@ -196,23 +208,17 @@ impl Component for Layout {
                     .width(Size::px(200.))
                     .height(Size::Fill)
                     .child(
-                        rect()
-                            .horizontal()
-                            .child(
-                                Button::new()
-                                    .child(svg(ARROW_LEFT_ICON))
-                                    .enabled(RouteContext::get().can_go_back())
-                                    .on_press(|_| {
-                                        RouteContext::get().go_back();
-                                    }),
-                            )
-                            // .child(
-                            //     Button::new().child(svg(ARROW_RIGHT_ICON)), /* .enabled(RouterContext::get().can_go_forward())
-                            //                                                  * .on_press(|_| {
-                            //                                                  *     RouterContext::get().go_forward();
-                            //                                                  * }), */
-                            // ),
+                        rect().horizontal().child(
+                            Button::new()
+                                .child(svg(ARROW_LEFT_ICON))
+                                .enabled(RouteContext::get().can_go_back())
+                                .on_press(|_| {
+                                    RouteContext::get().go_back();
+                                }),
+                        ),
                     )
+                    .child(layout_button(Route::Home))
+                    .child(layout_button(Route::MangaList))
                     .child(status),
             )
             .child(
@@ -221,7 +227,7 @@ impl Component for Layout {
                     .expanded()
                     .margin((5.0, 5.0, 5.0, 0.0))
                     .overflow(Overflow::Clip)
-                    .corner_radius(10.0)
+                    .corner_radius(DEFAULT_CORNER_RADIUS)
                     .background(Color::WHITE),
             )
             .background(Color::GRAY)

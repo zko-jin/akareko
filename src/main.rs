@@ -35,8 +35,8 @@ use crate::server::client::pool::ClientPool;
 use crate::ui::AkarekoApp;
 use crate::ui::AppChannel;
 use crate::ui::AppState;
-use crate::ui::Route;
 use crate::ui::RouteContext;
+use crate::ui::app_manager::AppManager;
 
 // use crate::ui::AppState;
 
@@ -129,126 +129,12 @@ fn main() -> Result<(), ()> {
         _ => {}
     };
 
-    enum Event {
-        ReloadConfig,
-    }
-
-    let (tx, rx) = mpsc::unbounded::<Event>();
-
-    let manager = async move |_| {
-        struct Manager {
-            client_thread: Option<JoinHandle<()>>,
-            radio_station: RadioStation<AppState, AppChannel>,
-            load_tx: mpsc::UnboundedSender<LoadEvent>,
-            load_rx: mpsc::UnboundedReceiver<LoadEvent>,
-            rx: mpsc::UnboundedReceiver<Event>,
-        }
-
-        impl Manager {
-            fn start_client_thread(&mut self) {
-                if let Some(t) = self.client_thread.take() {
-                    t.abort();
-                };
-
-                let config = match self.radio_station.read().config {
-                    ui::ResourceState::Loaded(ref config) => config.clone(),
-                    _ => return,
-                };
-
-                self.radio_station.write_channel(AppChannel::Client).client =
-                    ui::ResourceState::Loading;
-
-                let mut load_tx = self.load_tx.clone();
-                self.client_thread = Some(tokio::spawn(async move {
-                    let client = ClientPool::new(
-                        AkarekoClient::new(config.clone()).await,
-                        config.max_client_connections() as u16,
-                    );
-
-                    load_tx.send(LoadEvent::LoadedClient(client)).await.unwrap();
-                }));
-            }
-
-            async fn process_events(&mut self) {
-                loop {
-                    tokio::select! {
-                        val = self.rx.recv() => {
-                            match val.unwrap() {
-                                Event::ReloadConfig => todo!(),
-                            }
-                        }
-                        val = self.load_rx.recv() => {
-                            match val.unwrap() {
-                                LoadEvent::LoadedClient(client) => {
-                                    self.radio_station.write_channel(AppChannel::Client).client =
-                                        ui::ResourceState::Loaded(client);
-                                    self.client_thread = None;
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-        }
-
-        enum LoadEvent {
-            LoadedClient(ClientPool),
-        }
-
-        let (load_tx, load_rx) = mpsc::unbounded::<LoadEvent>();
-
-        let mut manager = Manager {
-            client_thread: None,
-            radio_station,
-            load_tx,
-            load_rx,
-            rx,
-        };
-
-        radio_station.write_channel(AppChannel::Config).config = ui::ResourceState::Loading;
-        let config = AkarekoConfig::load().await;
-        radio_station.write_channel(AppChannel::Config).config =
-            ui::ResourceState::Loaded(config.clone());
-
-        radio_station
-            .write_channel(AppChannel::TorrentClient)
-            .torrent_client = ui::ResourceState::Loading;
-        let torrent_client = TorrentClient::create(AnawtOptions::new());
-        match torrent_client.load("./data/torrents".into()).await {
-            Ok(_) => {}
-            Err(e) => {
-                error!("Failed to load torrents: {}", e);
-            }
-        }
-        radio_station
-            .write_channel(AppChannel::TorrentClient)
-            .torrent_client = ui::ResourceState::Loaded(torrent_client);
-
-        radio_station
-            .write_channel(AppChannel::Repository)
-            .repositories = ui::ResourceState::Loading;
-        let repos = Repositories::initialize(&config).await;
-        radio_station
-            .write_channel(AppChannel::Repository)
-            .repositories = ui::ResourceState::Loaded(repos.clone());
-
-        radio_station.write_channel(AppChannel::Server).server = ui::ResourceState::Loading;
-        let server = AkarekoServer::new();
-        let server_conf = Arc::new(RwLock::new(config.clone()));
-        tokio::spawn(async move {
-            server.run(server_conf, repos).await.unwrap();
-        });
-        radio_station.write_channel(AppChannel::Server).server = ui::ResourceState::Loaded(());
-
-        manager.start_client_thread();
-
-        manager.process_events().await;
-    };
+    let (manager, manager_tx) = AppManager::new(radio_station);
 
     launch(
         LaunchConfig::new()
             .with_tray(tray_icon, tray_handler)
-            .with_future(manager)
+            .with_future(async move |_| manager.run_manager().await)
             .with_window(WindowConfig::new_app(AkarekoApp::new(
                 radio_station,
                 router,

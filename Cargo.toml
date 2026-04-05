@@ -71,9 +71,10 @@ strum_macros = "0.28.0"
 # tray-icon = "0.21.3"
 #trayicon = { git = "https://github.com/pliduino/trayicon-rs.git", branch = "master", features = ["iced"] }
 clap = { version = "4.5.60", features = ["derive"] }
-freya = { version = "0.4.0-rc.16", features = ["router", "query", "tray", "radio", "calendar"] }
+# freya = { version = "0.4.0-rc.16", features = ["router", "query", "tray", "radio", "calendar"] }
+freya = { git = "https://github.com/SergioRibera/freya.git", branch = "hotreload", features = ["router", "query", "tray", "radio", "calendar"] }
 blocking = "1.6.2"
-freya-skia-safe = "0.94.0"
+freya-skia-safe = "0.96.0"
 # trayicon = "0.4.0"
 # diesel = { version = "2.3.6", features = ["sqlite"] }
 # diesel-async = { version = "0.7.4", features = ["sqlite", "bb8", "migrations"] }
@@ -92,7 +93,7 @@ lto = ["anawt/lto"]
 surrealdb = []
 sqlite = ["diesel"]
 diesel = []
-devtools = ["freya/devtools"]
+dev = ["freya/devtools", "freya/hotreload"]
 
 [profile.release]
 lto = "fat"

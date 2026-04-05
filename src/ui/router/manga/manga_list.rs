@@ -3,7 +3,7 @@ use freya::{prelude::*, query::*, radio::use_radio, router::RouterContext};
 use crate::{
     db::index::tags::MangaTag,
     ui::{
-        IndexComponent,
+        DEFAULT_PAGE_PADDING, IndexComponent,
         icons::PLUS_ICON,
         queries::FetchIndexes,
         router::{Route, RouteContext},
@@ -33,6 +33,7 @@ impl Component for MangaList {
         };
 
         rect()
+            .padding(DEFAULT_PAGE_PADDING)
             .child(
                 Button::new()
                     .child(svg(PLUS_ICON))

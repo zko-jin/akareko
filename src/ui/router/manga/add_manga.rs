@@ -4,12 +4,11 @@ use freya::{
     prelude::*,
     query::{Mutation, use_mutation},
     radio::use_radio,
-    router::RouterContext,
 };
 
 use crate::{
     db::index::{Index, tags::MangaTag},
-    ui::{AppChannel, ResourceState, queries::AddIndex, router::Route},
+    ui::{AppChannel, ResourceState, queries::AddIndex},
 };
 
 #[derive(PartialEq)]

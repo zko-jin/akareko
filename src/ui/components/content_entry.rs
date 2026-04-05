@@ -9,7 +9,9 @@ use crate::{
         tags::{IndexTag, MangaTag},
     },
     ui::{
-        Route, RouteContext, icons,
+        DEFAULT_CORNER_RADIUS, Route, RouteContext,
+        components::{Spacer, svg_button},
+        icons::{self, EYE_ICON},
         queries::{AddTorrent, FetchTorrentStatus, UpdateContentProgress},
     },
 };
@@ -33,22 +35,21 @@ impl<I: IndexTag + VisualizeRoute<I>> Component for ContentEntry<I> {
         let download_mutation = use_mutation(Mutation::new(AddTorrent));
 
         let watch_icon = {
-            let mut watch_icon = Button::new();
             let content = self.content.clone();
 
             if content.progress < content.count {
-                watch_icon = watch_icon.child(svg(icons::EYE_ICON)).on_press(move |_| {
-                    seen_mutation.mutate((content.signature().clone(), content.count));
-                });
+                svg_button(icons::EYE_ICON, 20., Color::WHITE)
+                    .on_press(move |_| {
+                        seen_mutation.mutate((content.signature().clone(), content.count));
+                    })
+                    .hover_background(Color::TRANSPARENT)
             } else {
-                watch_icon = watch_icon
-                    .child(svg(icons::EYE_SLASH_ICON))
+                svg_button(icons::EYE_SLASH_ICON, 20., Color::LIGHT_GRAY)
                     .on_press(move |_| {
                         seen_mutation.mutate((content.signature().clone(), 0));
-                    });
-            };
-
-            watch_icon
+                    })
+                    .hover_background(Color::TRANSPARENT)
+            }
         };
 
         let (torrent_status_icon, on_press_title): (
@@ -92,7 +93,11 @@ impl<I: IndexTag + VisualizeRoute<I>> Component for ContentEntry<I> {
                         .into();
                         (
                             Button::new()
-                                .child(svg(icons::DOWNLOAD_ICON).on_press(download_torrent.clone()))
+                                .child(
+                                    svg(icons::DOWNLOAD_ICON)
+                                        .on_press(download_torrent.clone())
+                                        .color(Color::WHITE),
+                                )
                                 .into_element(),
                             Some(download_torrent),
                         )
@@ -112,17 +117,57 @@ impl<I: IndexTag + VisualizeRoute<I>> Component for ContentEntry<I> {
 
         let first_line = rect()
             .horizontal()
+            .content(freya::prelude::Content::Flex)
+            .cross_align(Alignment::Center)
             .child(
-                label()
-                    .text(self.content.title().to_string())
+                rect()
+                    .child(
+                        label()
+                            .text(self.content.title().to_string())
+                            .color(Color::WHITE),
+                    )
+                    .on_pointer_enter(move |_| {
+                        if true {
+                            Cursor::set(CursorIcon::Pointer);
+                        } else {
+                            Cursor::set(CursorIcon::NotAllowed);
+                        }
+                    })
+                    .on_pointer_leave(move |_| {
+                        Cursor::set(CursorIcon::default());
+                    })
                     .maybe(on_press_title.is_some(), move |l| {
                         l.on_press(on_press_title.unwrap())
                     }),
             )
+            .child(Spacer::horizontal_fill())
             .child(torrent_status_icon)
             .child(watch_icon);
 
-        rect().child(first_line)
+        rect()
+            .width(Size::Fill)
+            .child(first_line.padding(5.))
+            .child(
+                rect()
+                    .width(Size::Fill)
+                    .background(Color::GRAY)
+                    .child(
+                        label()
+                            .text("Group: Anon")
+                            .color(Color::WHITE)
+                            .font_size(14),
+                    )
+                    .padding((0., 5.)),
+            )
+            .child(
+                ProgressBar::new(50.)
+                    .show_progress(false)
+                    .color(Color::TRANSPARENT)
+                    .width(Size::Fill)
+                    .height(10.),
+            )
+            .corner_radius(DEFAULT_CORNER_RADIUS)
+            .background(Color::DARK_GRAY)
     }
 }
 

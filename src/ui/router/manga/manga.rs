@@ -8,8 +8,8 @@ use freya::{
 use crate::{
     db::index::{Index, tags::MangaTag},
     ui::{
-        Route, RouteContext,
-        components::{AkLayers, ContentEntry},
+        DEFAULT_CORNER_RADIUS, DEFAULT_PAGE_PADDING, Route, RouteContext,
+        components::{AkLayers, ContentEntry, Spacer, svg_button},
         icons::PLUS_ICON,
         queries::{FetchContents, UpdateContentProgress},
     },
@@ -28,7 +28,7 @@ impl Component for Manga {
 
         let cover_holder: ImageSource = PathBuf::from("./assets/placeholder_cover.png").into();
 
-        let title = label().text(self.index.title().clone());
+        let title = label().text(self.index.title().clone()).font_size(24);
 
         let index = self.index.clone();
         let add_chapter_press = move |_| {
@@ -39,12 +39,16 @@ impl Component for Manga {
 
         let top = rect()
             .horizontal()
-            .child(ImageViewer::new(cover_holder).width(Size::px(400.)))
-            .child(title)
             .child(
-                Button::new()
-                    .child(svg(PLUS_ICON))
-                    .on_press(add_chapter_press),
+                ImageViewer::new(cover_holder)
+                    .width(Size::px(400.))
+                    .corner_radius(DEFAULT_CORNER_RADIUS),
+            )
+            .child(Spacer::horizontal(20.))
+            .child(
+                rect()
+                    .child(title)
+                    .child(svg_button(PLUS_ICON, 32., Color::BLACK).on_press(add_chapter_press)),
             );
 
         let chapters = match &*query.read().state() {
@@ -54,11 +58,7 @@ impl Component for Manga {
                 let chapters = contents
                     .iter()
                     .map(|c| ContentEntry::new(c.clone()).into_element());
-                rect()
-                    .vertical()
-                    .child("Chapters")
-                    .children(chapters)
-                    .into_element()
+                rect().vertical().children(chapters).into_element()
             }
             QueryStateData::Pending | QueryStateData::Loading { .. } => {
                 rect().child(CircularLoader::new()).into_element()
@@ -68,6 +68,10 @@ impl Component for Manga {
             }
         };
 
-        rect().child(top).child(chapters)
+        rect()
+            .child(top)
+            .child(Spacer::vertical(50.))
+            .child(chapters)
+            .padding(DEFAULT_PAGE_PADDING)
     }
 }
