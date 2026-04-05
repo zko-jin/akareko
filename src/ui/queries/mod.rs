@@ -1,15 +1,12 @@
-use std::path::PathBuf;
-
 use freya::{
     prelude::*,
-    query::{MutationCapability, QueriesStorage, QueryCapability},
+    query::{MutationCapability, QueriesStorage},
     radio::RadioStation,
 };
 
 use crate::{
     db::index::{Index, content::Content, tags::IndexTag},
-    errors::{DatabaseError, IoError},
-    types::Hash,
+    errors::DatabaseError,
     ui::{AppChannel, AppState, ResourceState},
 };
 
@@ -24,50 +21,36 @@ pub use fetch_torrent_status::FetchTorrentStatus;
 mod add_torrent;
 pub use add_torrent::AddTorrent;
 
-#[derive(Clone)]
-pub struct FetchIndex<I: IndexTag> {
-    _phantom: std::marker::PhantomData<I>,
-}
+// #[derive(Clone, Hash, PartialEq, Eq)]
+// pub struct FetchIndex<I: IndexTag> {
+//     _phantom: std::marker::PhantomData<I>,
+// }
 
-impl<I: IndexTag> FetchIndex<I> {
-    pub fn new() -> Self {
-        Self {
-            _phantom: std::marker::PhantomData,
-        }
-    }
-}
+// impl<I: IndexTag> FetchIndex<I> {
+//     pub fn new() -> Self {
+//         Self {
+//             _phantom: std::marker::PhantomData,
+//         }
+//     }
+// }
 
-impl<I: IndexTag> std::hash::Hash for FetchIndex<I> {
-    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
-        std::hash::Hash::hash(&0, state);
-    }
-}
+// impl<I: IndexTag + 'static> QueryCapability for FetchIndex<I> {
+//     type Ok = Option<Index<I>>;
+//     type Err = DatabaseError;
+//     type Keys = Hash;
 
-impl<I: IndexTag> PartialEq for FetchIndex<I> {
-    fn eq(&self, _: &Self) -> bool {
-        true
-    }
-}
+//     async fn run(&self, keys: &Self::Keys) -> Result<Self::Ok, Self::Err> {
+//         let radio = try_consume_root_context::<RadioStation<AppState,
+// AppChannel>>();         let Some(radio) = radio else {
+//             return Err(DatabaseError::NotInitialized);
+//         };
 
-impl<I: IndexTag> Eq for FetchIndex<I> {}
-
-impl<I: IndexTag + 'static> QueryCapability for FetchIndex<I> {
-    type Ok = Option<Index<I>>;
-    type Err = DatabaseError;
-    type Keys = Hash;
-
-    async fn run(&self, keys: &Self::Keys) -> Result<Self::Ok, Self::Err> {
-        let radio = try_consume_root_context::<RadioStation<AppState, AppChannel>>();
-        let Some(radio) = radio else {
-            return Err(DatabaseError::NotInitialized);
-        };
-
-        match &radio.read().repositories {
-            ResourceState::Loaded(r) => r.index().get_index(keys).await,
-            _ => Err(DatabaseError::NotInitialized),
-        }
-    }
-}
+//         match &radio.read().repositories {
+//             ResourceState::Loaded(r) => r.index().get_index(keys).await,
+//             _ => Err(DatabaseError::NotInitialized),
+//         }
+//     }
+// }
 
 #[derive(Clone)]
 pub struct AddIndex<I: IndexTag> {
@@ -167,18 +150,5 @@ impl<I: IndexTag + 'static> MutationCapability for AddIndexContent<I> {
 
     async fn on_settled(&self, _keys: &Self::Keys, _result: &Result<Self::Ok, Self::Err>) {
         QueriesStorage::<FetchIndexes<I>>::invalidate_all().await;
-    }
-}
-
-#[derive(Clone, Hash, PartialEq, Eq)]
-pub struct FetchMangaImages;
-
-impl QueryCapability for FetchMangaImages {
-    type Ok = ();
-    type Err = IoError;
-    type Keys = PathBuf;
-
-    async fn run(&self, keys: &Self::Keys) -> Result<Self::Ok, Self::Err> {
-        todo!()
     }
 }

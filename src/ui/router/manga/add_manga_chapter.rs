@@ -10,8 +10,8 @@ use crate::{
         },
     },
     helpers::Language,
-    types::{Hash, Timestamp},
-    ui::{AppChannel, ResourceState, queries::AddIndexContent, router::Route},
+    types::Timestamp,
+    ui::{AppChannel, ResourceState, queries::AddIndexContent},
 };
 
 #[derive(PartialEq)]

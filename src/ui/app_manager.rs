@@ -103,7 +103,7 @@ impl AppManager {
 
         self.radio_station.write_channel(AppChannel::Client).client = ResourceState::Loading;
 
-        let mut load_tx = self.load_tx.clone();
+        let load_tx = self.load_tx.clone();
         self.client_thread = Some(tokio::spawn(async move {
             let client = ClientPool::new(
                 AkarekoClient::new(config.clone()).await,

@@ -1,5 +1,3 @@
-use std::sync::LazyLock;
-
 macro_rules! icon {
     ($name:ident, $path:literal) => {
         pub const $name: &[u8] = include_bytes!($path);

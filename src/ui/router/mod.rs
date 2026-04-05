@@ -1,14 +1,9 @@
-use std::path::PathBuf;
-
 use crate::db::index::Index;
 use crate::db::index::content::Content;
 use crate::db::index::tags::MangaTag;
 use crate::helpers::LiFo;
-use crate::types::{Hash, Signature};
-use crate::ui::Layout;
 use crate::ui::router::manga::Config;
 use freya::prelude::*;
-use freya::router::Routable;
 
 mod home;
 mod manga {
@@ -54,10 +49,10 @@ impl Route {
         match self {
             Route::Home => "Home",
             Route::MangaList => "Mangas",
-            Route::Manga { index } => "",
+            Route::Manga { .. } => "",
             Route::AddManga => "Add Manga",
-            Route::AddMangaChapter { index } => "",
-            Route::ChapterViewer { content } => "",
+            Route::AddMangaChapter { .. } => "",
+            Route::ChapterViewer { .. } => "",
             Route::Config => "Config",
         }
     }

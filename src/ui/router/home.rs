@@ -1,8 +1,4 @@
-use crate::ui::{
-    AppChannel, DEFAULT_CORNER_RADIUS, DEFAULT_PAGE_PADDING, ResourceState,
-    components::Spacer,
-    router::{Route, RouteContext},
-};
+use crate::ui::{AppChannel, DEFAULT_CORNER_RADIUS, DEFAULT_PAGE_PADDING, ResourceState};
 use freya::{prelude::*, radio::use_radio};
 
 #[derive(PartialEq)]

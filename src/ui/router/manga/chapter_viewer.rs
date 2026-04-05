@@ -1,22 +1,17 @@
-use std::{cell::RefCell, ops::Deref, path::PathBuf, rc::Rc};
+use std::{cell::RefCell, path::PathBuf, rc::Rc};
 
 use async_zip::tokio::read::seek::ZipFileReader;
 use freya::{
-    animation::{use_animation, use_animation_transition},
-    elements::image::{ImageData, ImageHolder, image},
+    elements::image::{ImageHolder, image},
     prelude::*,
-    query::*,
     radio::use_radio,
-    router::RouterContext,
 };
 use futures::AsyncReadExt as _;
-use image::EncodableLayout;
 use tokio::{fs::File, io::BufReader};
 use tracing::error;
 
 use crate::{
     db::index::{content::Content, tags::MangaTag},
-    types::Signature,
     ui::{AppChannel, ResourceState, components::AkLayers},
 };
 

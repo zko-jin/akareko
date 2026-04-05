@@ -1,17 +1,15 @@
-use std::path::PathBuf;
-
 use freya::{
     prelude::*,
-    query::{Mutation, Query, QueryStateData, use_mutation, use_query},
+    query::{Query, QueryStateData, use_query},
 };
 
 use crate::{
     db::index::{Index, tags::MangaTag},
     ui::{
         DEFAULT_CORNER_RADIUS, DEFAULT_PAGE_PADDING, Route, RouteContext, UNKNOWN_COVER,
-        components::{AkLayers, ContentEntry, Spacer, svg_button},
+        components::{ContentEntry, Spacer, svg_button},
         icons::PLUS_ICON,
-        queries::{FetchContents, UpdateContentProgress},
+        queries::FetchContents,
     },
 };
 

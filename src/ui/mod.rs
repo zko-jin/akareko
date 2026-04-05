@@ -1,12 +1,7 @@
-use std::{
-    ffi::OsStr,
-    path::{Path, PathBuf},
-};
-
 use anawt::TorrentClient;
 use freya::{
     prelude::*,
-    radio::{RadioChannel, RadioStation, use_radio, use_share_radio},
+    radio::{RadioChannel, RadioStation, use_share_radio},
 };
 
 use crate::{
@@ -17,9 +12,7 @@ use crate::{
     },
     server::client::pool::ClientPool,
     ui::{
-        components::{AkLayers, layout_button},
-        icons::{ARROW_LEFT_ICON, ARROW_RIGHT_ICON},
-        router::RouteComponent,
+        components::layout_button, icons::ARROW_LEFT_ICON, router::RouteComponent,
         theme::CUSTOM_THEME,
     },
 };
@@ -38,8 +31,6 @@ const UNKNOWN_COVER: (&'static str, Bytes) = (
     "unknown_cover",
     Bytes::from_static(include_bytes!("../../assets/placeholder_cover.png")),
 );
-
-struct UniqueMainWindowMarker;
 
 #[derive(Clone)]
 struct IndexComponent<I: IndexTag + 'static> {

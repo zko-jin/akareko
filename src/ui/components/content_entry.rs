@@ -11,7 +11,7 @@ use crate::{
     ui::{
         DEFAULT_CORNER_RADIUS, Route, RouteContext,
         components::{Spacer, svg_button},
-        icons::{self, EYE_ICON},
+        icons::{self},
         queries::{AddTorrent, FetchTorrentStatus, UpdateContentProgress},
     },
 };

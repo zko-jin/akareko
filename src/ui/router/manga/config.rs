@@ -2,7 +2,7 @@ use const_format::formatcp;
 use freya::{prelude::*, radio::use_radio};
 
 use crate::{
-    config::{AkarekoConfig, DEFAULT_SAM_PORT},
+    config::DEFAULT_SAM_PORT,
     ui::{AppChannel, DEFAULT_PAGE_PADDING},
 };
 
