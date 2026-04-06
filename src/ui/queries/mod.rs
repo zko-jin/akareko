@@ -10,6 +10,13 @@ use crate::{
     ui::{AppChannel, AppState, ResourceState},
 };
 
+mod follow {
+    pub mod follow_content;
+    pub mod get_follow_content;
+}
+pub use follow::follow_content::FollowContent;
+pub use follow::get_follow_content::GetFollowContent;
+
 mod fetch_indexes;
 pub use fetch_indexes::FetchIndexes;
 mod fetch_contents;
@@ -20,37 +27,6 @@ mod fetch_torrent_status;
 pub use fetch_torrent_status::FetchTorrentStatus;
 mod add_torrent;
 pub use add_torrent::AddTorrent;
-
-// #[derive(Clone, Hash, PartialEq, Eq)]
-// pub struct FetchIndex<I: IndexTag> {
-//     _phantom: std::marker::PhantomData<I>,
-// }
-
-// impl<I: IndexTag> FetchIndex<I> {
-//     pub fn new() -> Self {
-//         Self {
-//             _phantom: std::marker::PhantomData,
-//         }
-//     }
-// }
-
-// impl<I: IndexTag + 'static> QueryCapability for FetchIndex<I> {
-//     type Ok = Option<Index<I>>;
-//     type Err = DatabaseError;
-//     type Keys = Hash;
-
-//     async fn run(&self, keys: &Self::Keys) -> Result<Self::Ok, Self::Err> {
-//         let radio = try_consume_root_context::<RadioStation<AppState,
-// AppChannel>>();         let Some(radio) = radio else {
-//             return Err(DatabaseError::NotInitialized);
-//         };
-
-//         match &radio.read().repositories {
-//             ResourceState::Loaded(r) => r.index().get_index(keys).await,
-//             _ => Err(DatabaseError::NotInitialized),
-//         }
-//     }
-// }
 
 #[derive(Clone)]
 pub struct AddIndex<I: IndexTag> {

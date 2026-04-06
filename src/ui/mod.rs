@@ -12,7 +12,9 @@ use crate::{
     },
     server::client::pool::ClientPool,
     ui::{
-        components::layout_button, icons::ARROW_LEFT_ICON, router::RouteComponent,
+        components::{layout_button, no_reaction_button},
+        icons::ARROW_LEFT_ICON,
+        router::RouteComponent,
         theme::CUSTOM_THEME,
     },
 };
@@ -51,19 +53,13 @@ impl<I: IndexTag + 'static> Component for IndexComponent<I> {
             });
         };
 
-        let cover_image = rect()
+        let cover_image = no_reaction_button()
             .child(
                 ImageViewer::new(UNKNOWN_COVER)
                     .corner_radius(DEFAULT_CORNER_RADIUS)
                     .height(Size::px(200.)),
             )
-            .on_press(on_press.clone())
-            .on_pointer_enter(|_| {
-                Cursor::set(CursorIcon::Pointer);
-            })
-            .on_pointer_leave(|_| {
-                Cursor::set(CursorIcon::default());
-            });
+            .on_press(on_press.clone());
 
         rect()
             .horizontal()
@@ -74,16 +70,13 @@ impl<I: IndexTag + 'static> Component for IndexComponent<I> {
             .child(cover_image)
             .child(
                 rect().width(Size::px(250.)).child(
-                    label()
-                        .text(self.index.title().clone())
-                        .font_weight(FontWeight::BOLD)
-                        .on_press(on_press)
-                        .on_pointer_enter(|_| {
-                            Cursor::set(CursorIcon::Pointer);
-                        })
-                        .on_pointer_leave(|_| {
-                            Cursor::set(CursorIcon::default());
-                        }),
+                    no_reaction_button()
+                        .child(
+                            label()
+                                .text(self.index.title().clone())
+                                .font_weight(FontWeight::BOLD),
+                        )
+                        .on_press(on_press),
                 ),
             )
     }

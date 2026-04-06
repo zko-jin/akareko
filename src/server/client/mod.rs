@@ -277,11 +277,11 @@ impl AkarekoClient {
     //                 {
     //                     Ok(i) => match i {
     //                         Some(_) => {
-    //                             
-    // existing_indexes.insert(content.index_hash().clone());                   
+    //
+    // existing_indexes.insert(content.index_hash().clone());
     // }                         None => {
-    //                             
-    // missing_indexes.push(content.index_hash().clone());                      
+    //
+    // missing_indexes.push(content.index_hash().clone());
     // }                     },
     //                     Err(e) => {
     //                         error!("Failed to get index: {}", e);
@@ -335,7 +335,7 @@ impl AkarekoClient {
     //         match content {
     //             TaggedContent::Manga(content) => {
     //                 match
-    // self.repositories.index().await.add_content(content).await {             
+    // self.repositories.index().await.add_content(content).await {
     // Ok(_) => {}                     Err(e) => {
     //                         error!("Failed to add content: {}", e);
     //                     }

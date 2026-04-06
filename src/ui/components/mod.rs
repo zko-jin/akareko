@@ -22,14 +22,13 @@ impl Into<Layer> for AkLayers {
 }
 
 pub fn svg_button(icon: &'static [u8], size: f32, color: Color) -> Button {
-    Button::new()
+    no_reaction_button()
         .child(
             svg(icon)
                 .width(Size::px(size))
                 .height(Size::px(size))
                 .fill(color),
         )
-        .padding(0.)
         .flat()
         .compact()
 }
@@ -70,4 +69,13 @@ impl Spacer {
             width: Size::flex(1.),
         }
     }
+}
+
+pub fn no_reaction_button() -> Button {
+    Button::new()
+        .flat()
+        .compact()
+        .corner_radius(0.)
+        .padding(0.)
+        .hover_background(Color::TRANSPARENT)
 }

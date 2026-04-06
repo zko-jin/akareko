@@ -10,7 +10,7 @@ use crate::{
     },
     ui::{
         DEFAULT_CORNER_RADIUS, Route, RouteContext,
-        components::{Spacer, svg_button},
+        components::{Spacer, no_reaction_button, svg_button},
         icons::{self},
         queries::{AddTorrent, FetchTorrentStatus, UpdateContentProgress},
     },
@@ -117,34 +117,27 @@ impl<I: IndexTag + VisualizeRoute<I>> Component for ContentEntry<I> {
             ),
         };
 
+        let post_icon = svg_button(icons::CHAT_ICON, 24., Color::WHITE);
+
         let first_line = rect()
             .horizontal()
             .content(freya::prelude::Content::Flex)
             .cross_align(Alignment::Center)
             .child(
-                rect()
+                no_reaction_button()
                     .child(
                         label()
                             .text(self.content.title().to_string())
                             .color(Color::WHITE),
                     )
-                    .on_pointer_enter(move |_| {
-                        if true {
-                            Cursor::set(CursorIcon::Pointer);
-                        } else {
-                            Cursor::set(CursorIcon::NotAllowed);
-                        }
-                    })
-                    .on_pointer_leave(move |_| {
-                        Cursor::set(CursorIcon::default());
-                    })
                     .maybe(on_press_title.is_some(), move |l| {
                         l.on_press(on_press_title.unwrap())
                     }),
             )
             .child(Spacer::horizontal_fill())
+            .child(watch_icon)
             .child(torrent_status_icon)
-            .child(watch_icon);
+            .child(post_icon);
 
         rect()
             .width(Size::Fill)
@@ -164,7 +157,6 @@ impl<I: IndexTag + VisualizeRoute<I>> Component for ContentEntry<I> {
             .child(
                 ProgressBar::new(50.)
                     .show_progress(false)
-                    .color(Color::TRANSPARENT)
                     .width(Size::Fill)
                     .height(10.),
             )

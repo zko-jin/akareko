@@ -1,6 +1,6 @@
 use freya::{
     prelude::*,
-    query::{Query, QueryStateData, use_query},
+    query::{Mutation, Query, QueryStateData, use_mutation, use_query},
 };
 
 use crate::{
@@ -8,8 +8,8 @@ use crate::{
     ui::{
         DEFAULT_CORNER_RADIUS, DEFAULT_PAGE_PADDING, Route, RouteContext, UNKNOWN_COVER,
         components::{ContentEntry, Spacer, svg_button},
-        icons::PLUS_ICON,
-        queries::FetchContents,
+        icons::{self},
+        queries::{FetchContents, FollowContent, GetFollowContent},
     },
 };
 
@@ -19,10 +19,15 @@ pub struct Manga {
 }
 impl Component for Manga {
     fn render(&self) -> impl IntoElement {
-        let query = use_query(Query::new(
+        let contents_query = use_query(Query::new(
             self.index.hash().clone(),
             FetchContents::<MangaTag>::new(),
         ));
+        let bookmark_query = use_query(Query::new(
+            self.index.hash().clone(),
+            GetFollowContent::<MangaTag>::new(),
+        ));
+        let bookmark_mut = use_mutation(Mutation::new(FollowContent::<MangaTag>::new()));
 
         let title = label().text(self.index.title().clone()).font_size(24);
 
@@ -33,6 +38,35 @@ impl Component for Manga {
             });
         };
 
+        let follow_button = match &*bookmark_query.read().state() {
+            QueryStateData::Pending => CircularLoader::new().into_element(),
+            QueryStateData::Loading { .. } => CircularLoader::new().into_element(),
+            QueryStateData::Settled { res, .. } => match res {
+                Ok(Some(_)) => {
+                    let index_hash = self.index.hash().clone();
+                    Button::new()
+                        .child(svg(icons::BOOK_BOOKMARK_ICON))
+                        .on_press(move |_| {
+                            bookmark_mut.mutate((index_hash.clone(), false));
+                        })
+                        .into_element()
+                }
+                Ok(None) => {
+                    let index_hash = self.index.hash().clone();
+                    Button::new()
+                        .child(svg(icons::BOOK_BOOKMARK_ICON))
+                        .on_press(move |_| {
+                            bookmark_mut.mutate((index_hash.clone(), false));
+                        })
+                        .into_element()
+                }
+                Err(_) => "X".into_element(),
+            },
+        };
+
+        let add_chapter_button =
+            svg_button(icons::PLUS_ICON, 32., Color::BLACK).on_press(add_chapter_press);
+
         let top = rect()
             .horizontal()
             .child(
@@ -42,12 +76,15 @@ impl Component for Manga {
             )
             .child(Spacer::horizontal(20.))
             .child(
-                rect()
-                    .child(title)
-                    .child(svg_button(PLUS_ICON, 32., Color::BLACK).on_press(add_chapter_press)),
+                rect().child(title).child(
+                    rect()
+                        .horizontal()
+                        .child(add_chapter_button)
+                        .child(follow_button),
+                ),
             );
 
-        let chapters = match &*query.read().state() {
+        let chapters = match &*contents_query.read().state() {
             QueryStateData::Settled {
                 res: Ok(contents), ..
             } => {
