@@ -33,6 +33,7 @@ mod ui;
 #[derive(Parser)]
 #[command(author, version, about)]
 struct CliArgs {
+    ///   Start the application in minimized state.
     #[arg(long)]
     minimized: bool,
 }

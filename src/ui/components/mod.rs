@@ -27,7 +27,7 @@ pub fn svg_button(icon: &'static [u8], size: f32, color: Color) -> Button {
             svg(icon)
                 .width(Size::px(size))
                 .height(Size::px(size))
-                .color(color),
+                .fill(color),
         )
         .padding(0.)
         .flat()
