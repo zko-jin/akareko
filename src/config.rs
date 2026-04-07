@@ -1,3 +1,5 @@
+use std::num::NonZero;
+
 use serde::{Deserialize, Serialize};
 use tokio::fs;
 use tracing::{error, warn};
@@ -12,13 +14,13 @@ use crate::{
 
 pub const DEFAULT_SAM_PORT: u16 = 7656;
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct KeyPair {
     private_key: PrivateKey,
     //todo: custom serialize to remove public_key
     public_key: PublicKey,
 }
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct SchedulerConfig {
     pub full_sync_interval: Timestamp,
 }
@@ -42,7 +44,7 @@ impl KeyPair {
     }
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 #[serde(default)]
 pub struct AkarekoConfig {
     #[serde(flatten)]
@@ -63,7 +65,7 @@ pub struct AkarekoConfig {
     is_relay: bool,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub enum ImageScale {
     /// Image will be stretched to fit the screen
     Fill,
@@ -75,25 +77,25 @@ pub enum ImageScale {
     None,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub enum ImageVisualizationType {
     LeftToRight,
     RightToLeft,
     Scroll,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct ImageViewerPreferences {
     pub double_pages: bool,
     /// Percentage of the image size
-    pub zoom: i16,
+    pub zoom: NonZero<u16>,
     pub scale: ImageScale,
     pub visualization_type: ImageVisualizationType,
 }
 
 impl ImageViewerPreferences {
     pub fn zoom(&self) -> f32 {
-        self.zoom as f32 / 100.0
+        self.zoom.get() as f32 / 100.0
     }
 }
 
@@ -101,7 +103,8 @@ impl Default for ImageViewerPreferences {
     fn default() -> Self {
         Self {
             double_pages: false,
-            zoom: 100,
+            // SAFETY: 100 is not 0
+            zoom: unsafe { NonZero::new_unchecked(100) },
             scale: ImageScale::FitHorizontally,
             visualization_type: ImageVisualizationType::LeftToRight,
         }
@@ -190,20 +193,24 @@ impl AkarekoConfig {
         self.sam_port
     }
 
+    pub fn set_sam_port(&mut self, port: u16) {
+        self.sam_port = port;
+    }
+
     pub fn image_viewer_preferences(&self) -> &ImageViewerPreferences {
         &self.image_viewer_preferences
     }
 
-    pub fn zoom(&self) -> i16 {
-        self.image_viewer_preferences.zoom
+    pub fn zoom(&self) -> u16 {
+        self.image_viewer_preferences.zoom.get()
     }
 
-    pub fn set_zoom(&mut self, zoom: i16) {
-        if zoom < 1 {
-            self.image_viewer_preferences.zoom = 1;
-            return;
+    pub fn set_zoom(&mut self, zoom: u16) {
+        match NonZero::new(zoom) {
+            Some(v) => self.image_viewer_preferences.zoom = v,
+            // SAFETY: 1 is not 0
+            None => self.image_viewer_preferences.zoom = unsafe { NonZero::new_unchecked(1) },
         }
-        self.image_viewer_preferences.zoom = zoom;
     }
 
     pub fn public_key(&self) -> &PublicKey {

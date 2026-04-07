@@ -2,32 +2,30 @@ use const_format::formatcp;
 use freya::{prelude::*, radio::use_radio};
 
 use crate::{
-    config::DEFAULT_SAM_PORT,
-    ui::{AppChannel, DEFAULT_PAGE_PADDING},
+    config::{AkarekoConfig, DEFAULT_SAM_PORT},
+    ui::{AppChannel, DEFAULT_PAGE_PADDING, ResourceState},
 };
 
 #[derive(PartialEq)]
-pub struct Config;
+pub struct Settings;
 
 const DEFAULT_SAM_PORT_STR: &'static str = formatcp!("{}", DEFAULT_SAM_PORT);
-impl Component for Config {
+impl Component for Settings {
     fn render(&self) -> impl IntoElement {
         let mut radio = use_radio(AppChannel::Config);
+        let mut new_config = use_state(|| radio.read().config.unwrap_ref().clone());
+
         let sam_port_string = use_state(move || {
-            let sam_port = radio.read().config.unwrap_ref().sam_port();
-            if sam_port == DEFAULT_SAM_PORT {
-                String::new()
-            } else {
-                sam_port.to_string()
-            }
+            let sam_port = new_config.read().sam_port();
+            sam_port.to_string()
         });
 
         let dev_mode_switch = Switch::new()
-            .toggled(radio.read().config.unwrap_ref().dev_mode())
+            .toggled(new_config.read().dev_mode())
             .on_toggle(move |_| {
-                let mut w = radio.write();
-                let config = w.config.mut_unwrap_ref();
-                config.set_dev_mode(!config.dev_mode());
+                let mut config = new_config.write();
+                let dev_mode = !config.dev_mode();
+                config.set_dev_mode(dev_mode);
             });
 
         let sam_port_input = rect()
@@ -38,13 +36,19 @@ impl Component for Config {
             .child(
                 Input::new(sam_port_string)
                     .placeholder(DEFAULT_SAM_PORT_STR)
-                    .on_validate(|v: InputValidator| {
+                    .on_validate(move |v: InputValidator| {
                         if v.text().is_empty() {
-                            v.set_valid(true);
+                            new_config.write().set_sam_port(DEFAULT_SAM_PORT);
                             return;
                         }
+
                         let r = v.text().parse::<u16>();
-                        v.set_valid(r.is_ok());
+                        if let Ok(port) = r {
+                            new_config.write().set_sam_port(port);
+                            return;
+                        }
+
+                        v.set_valid(false);
                     }),
             );
 
@@ -55,17 +59,11 @@ impl Component for Config {
                     .spacing(20.)
                     .horizontal()
                     .child("I2P Address:")
-                    .child(
-                        radio
-                            .read()
-                            .config
-                            .unwrap_ref()
-                            .eepsite_address()
-                            .inner()
-                            .clone(),
-                    ),
+                    .child(new_config.read().eepsite_address().inner().clone()),
             )
             .child(sam_port_input);
+
+        let is_dirty = *radio.read().config.unwrap_ref() != *new_config.read();
 
         rect()
             .padding(DEFAULT_PAGE_PADDING)
@@ -76,7 +74,15 @@ impl Component for Config {
             .child(
                 rect()
                     .horizontal()
-                    .child(Button::new().child("Save"))
+                    .child(
+                        Button::new()
+                            .child("Save")
+                            .enabled(is_dirty)
+                            .on_press(move |_| {
+                                radio.write().config =
+                                    ResourceState::Loaded(new_config.read().cloned());
+                            }),
+                    )
                     .child(Button::new().child("Cancel")),
             )
     }

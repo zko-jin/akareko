@@ -16,7 +16,7 @@ use zeroize::ZeroizeOnDrop;
 
 use crate::errors::Base64Error;
 
-#[derive(Serialize, Deserialize, Debug, Clone, ZeroizeOnDrop)]
+#[derive(Serialize, Deserialize, Debug, Clone, ZeroizeOnDrop, PartialEq)]
 #[serde(transparent)]
 pub struct PrivateKey(#[serde(with = "serde_bytes")] [u8; 32]);
 

@@ -4,8 +4,8 @@ use crate::db::index::tags::MangaTag;
 use crate::helpers::LiFo;
 use freya::prelude::*;
 
-mod config;
 mod home;
+mod settings;
 mod manga {
     mod manga;
     pub use manga::Manga;
@@ -19,9 +19,9 @@ mod manga {
     pub use chapter_viewer::ChapterViewer;
 }
 
-use config::Config;
 use home::Home;
 use manga::{AddManga, AddMangaChapter, ChapterViewer, Manga, MangaList};
+use settings::Settings;
 
 #[derive(Clone, PartialEq)]
 pub enum Route {
@@ -40,7 +40,7 @@ pub enum Route {
     AddMangaChapter { index: Index<MangaTag> },
     // #[route("/chapter/:signature")]
     ChapterViewer { content: Content<MangaTag> },
-    Config,
+    Settings,
 }
 
 impl Route {
@@ -52,7 +52,7 @@ impl Route {
             Route::AddManga => "Add Manga",
             Route::AddMangaChapter { .. } => "",
             Route::ChapterViewer { .. } => "",
-            Route::Config => "Config",
+            Route::Settings => "Settings",
         }
     }
 }
@@ -140,7 +140,7 @@ impl Component for Route {
                 content: content.clone(),
             }
             .into_element(),
-            Route::Config => Config.into_element(),
+            Route::Settings => Settings.into_element(),
         }
     }
 }
