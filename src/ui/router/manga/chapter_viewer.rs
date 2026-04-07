@@ -4,6 +4,7 @@ use async_zip::tokio::read::seek::ZipFileReader;
 use freya::{
     elements::image::{ImageHolder, image},
     prelude::*,
+    query::{Mutation, UseMutation, use_mutation},
     radio::use_radio,
 };
 use futures::AsyncReadExt as _;
@@ -11,8 +12,11 @@ use tokio::{fs::File, io::BufReader};
 use tracing::error;
 
 use crate::{
-    db::index::{content::Content, tags::MangaTag},
-    ui::{AppChannel, ResourceState, components::AkLayers},
+    db::index::{
+        content::Content,
+        tags::{IndexTag, MangaTag},
+    },
+    ui::{AppChannel, ResourceState, components::AkLayers, queries::UpdateContentCount},
 };
 
 #[derive(PartialEq)]
@@ -25,12 +29,9 @@ impl Component for ChapterViewer {
         let mut cur_page = use_state(|| 0);
         let mut show_sidebar = use_state(|| true);
 
-        let path = PathBuf::from(format!(
-            "./data/mangas/{}/{}",
-            self.content.signature().as_base64(),
-            self.content.path()
-        ));
-        image_loader(path, images);
+        let count_mutation = use_mutation(Mutation::new(UpdateContentCount::<MangaTag>::new()));
+
+        image_loader(&self.content, images, count_mutation);
         let mut config = use_radio(AppChannel::Config);
 
         let mut scroll_controller = use_scroll_controller(ScrollConfig::default);
@@ -56,11 +57,31 @@ impl Component for ChapterViewer {
                 // On submit
                 Code::ArrowLeft => {
                     e.stop_propagation();
-                    back_page();
+                    match config
+                        .read()
+                        .config
+                        .unwrap_ref()
+                        .image_viewer_preferences()
+                        .visualization_type
+                    {
+                        crate::config::ImageVisualizationType::LeftToRight => back_page(),
+                        crate::config::ImageVisualizationType::RightToLeft => forward_page(),
+                        crate::config::ImageVisualizationType::Scroll => todo!(),
+                    }
                 }
                 Code::ArrowRight => {
                     e.stop_propagation();
-                    forward_page();
+                    match config
+                        .read()
+                        .config
+                        .unwrap_ref()
+                        .image_viewer_preferences()
+                        .visualization_type
+                    {
+                        crate::config::ImageVisualizationType::LeftToRight => forward_page(),
+                        crate::config::ImageVisualizationType::RightToLeft => back_page(),
+                        crate::config::ImageVisualizationType::Scroll => todo!(),
+                    }
                 }
                 Code::ArrowDown => {
                     // e.stop_propagation();
@@ -190,7 +211,20 @@ impl Component for ChapterViewer {
     }
 }
 
-fn image_loader(path: PathBuf, mut images: State<Vec<Option<ImageHolder>>>) -> TaskHandle {
+fn image_loader<I: IndexTag>(
+    content: &Content<I>,
+    mut images: State<Vec<Option<ImageHolder>>>,
+    count_mutation: UseMutation<UpdateContentCount<MangaTag>>,
+) -> TaskHandle {
+    let path = PathBuf::from(format!(
+        "./data/{}/{}/{}",
+        I::TAG,
+        content.signature().as_base64(),
+        content.path()
+    ));
+
+    let signature = content.signature().clone();
+
     let chapter_loader = use_hook(move || {
         spawn(async move {
             if !path.exists() {
@@ -209,6 +243,7 @@ fn image_loader(path: PathBuf, mut images: State<Vec<Option<ImageHolder>>>) -> T
                 }
 
                 *images.write() = vec![None; paths.len()];
+                count_mutation.mutate((signature, paths.len() as u32));
 
                 for (i, path) in paths.iter().enumerate() {
                     let bytes: Bytes = tokio::fs::read(path).await.unwrap().into();

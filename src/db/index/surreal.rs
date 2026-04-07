@@ -83,8 +83,26 @@ impl<'a> IndexRepository<'a> {
         let content: Option<Content<T>> = self
             .db
             .query(query)
-            .bind(("progress", progress))
             .bind(("id", RecordId::new(T::CONTENT_TABLE, signature.as_base64())))
+            .bind(("progress", progress))
+            .await?
+            .take(0)?;
+
+        Ok(content)
+    }
+
+    pub async fn update_content_count<I: IndexTag>(
+        &self,
+        signature: Signature,
+        count: u32,
+    ) -> Result<Option<Content<I>>, DatabaseError> {
+        let query = format!("UPDATE $id SET count = $count");
+
+        let content: Option<Content<I>> = self
+            .db
+            .query(query)
+            .bind(("id", RecordId::new(I::CONTENT_TABLE, signature.as_base64())))
+            .bind(("count", count))
             .await?
             .take(0)?;
 

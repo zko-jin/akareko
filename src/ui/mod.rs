@@ -253,7 +253,7 @@ impl Component for Layout {
                     )
                     .child(layout_button(Route::Home))
                     .child(layout_button(Route::MangaList))
-                    .child(layout_button(Route::Config)),
+                    .child(layout_button(Route::Settings)),
             )
             .child(
                 rect()

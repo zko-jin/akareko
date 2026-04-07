@@ -187,4 +187,8 @@ impl<T: IndexTag> Content<T> {
     pub fn index_hash(&self) -> &Hash {
         &self.index_hash
     }
+
+    pub fn calculate_progress(&self) -> f32 {
+        self.progress as f32 / self.count as f32 * 100.0
+    }
 }

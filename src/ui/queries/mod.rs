@@ -17,6 +17,11 @@ mod follow {
 pub use follow::follow_content::FollowContent;
 pub use follow::get_follow_content::GetFollowContent;
 
+mod content {
+    pub mod update_content_count;
+}
+pub use content::update_content_count::UpdateContentCount;
+
 mod fetch_indexes;
 pub use fetch_indexes::FetchIndexes;
 mod fetch_contents;

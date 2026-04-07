@@ -2,6 +2,7 @@ use std::time::Duration;
 
 use anawt::InfoHash;
 use freya::{prelude::*, query::*};
+use tracing::trace;
 
 use crate::{
     db::index::{
@@ -119,6 +120,10 @@ impl<I: IndexTag + VisualizeRoute<I>> Component for ContentEntry<I> {
 
         let post_icon = svg_button(icons::CHAT_ICON, 24., Color::WHITE);
 
+        let progress = self.content.calculate_progress();
+
+        trace!("Progress: {}", progress);
+
         let first_line = rect()
             .horizontal()
             .content(freya::prelude::Content::Flex)
@@ -127,7 +132,15 @@ impl<I: IndexTag + VisualizeRoute<I>> Component for ContentEntry<I> {
                 no_reaction_button()
                     .child(
                         label()
-                            .text(self.content.title().to_string())
+                            .text(format!(
+                                "Ch. {}: {}",
+                                self.content.enumeration(),
+                                self.content.title().to_string()
+                            ))
+                            .text_decoration(TextDecoration::Underline)
+                            .maybe(progress >= 100.0, |el| {
+                                el.text_decoration(TextDecoration::LineThrough)
+                            })
                             .color(Color::WHITE),
                     )
                     .maybe(on_press_title.is_some(), move |l| {
@@ -155,7 +168,7 @@ impl<I: IndexTag + VisualizeRoute<I>> Component for ContentEntry<I> {
                     .padding((0., 5.)),
             )
             .child(
-                ProgressBar::new(50.)
+                ProgressBar::new(progress)
                     .show_progress(false)
                     .width(Size::Fill)
                     .height(10.),
