@@ -2,9 +2,9 @@ use crate::db::index::Index;
 use crate::db::index::content::Content;
 use crate::db::index::tags::MangaTag;
 use crate::helpers::LiFo;
-use crate::ui::router::manga::Config;
 use freya::prelude::*;
 
+mod config;
 mod home;
 mod manga {
     mod manga;
@@ -17,10 +17,9 @@ mod manga {
     pub use add_manga_chapter::AddMangaChapter;
     mod chapter_viewer;
     pub use chapter_viewer::ChapterViewer;
-    mod config;
-    pub use config::Config;
 }
 
+use config::Config;
 use home::Home;
 use manga::{AddManga, AddMangaChapter, ChapterViewer, Manga, MangaList};
 
