@@ -30,7 +30,13 @@ pub struct ChapterViewer {
 impl Component for ChapterViewer {
     fn render(&self) -> impl IntoElement {
         let images = use_state(Vec::<Option<ImageHolder>>::new);
-        let mut cur_page = use_state(|| 0);
+        let mut cur_page_index = use_state(|| {
+            if self.content.progress == 0 || self.content.progress == self.content.count {
+                0
+            } else {
+                self.content.progress - 1
+            }
+        });
         let mut show_sidebar = use_state(|| true);
 
         let count_mutation = use_mutation(Mutation::new(UpdateContentCount::<MangaTag>::new()));
@@ -45,21 +51,21 @@ impl Component for ChapterViewer {
         let signature = self.content.signature().clone();
         let prog = self.content.progress;
         use_side_effect(move || {
-            let cur_page = cur_page();
+            let cur_page = cur_page_index() + 1;
             if cur_page > prog {
-                progress_mutation.mutate((signature.clone(), cur_page + 1));
+                progress_mutation.mutate((signature.clone(), cur_page));
             };
         });
 
         let mut back_page = move || {
-            let mut cur_page = cur_page.write();
+            let mut cur_page = cur_page_index.write();
             if *cur_page > 0 {
                 *cur_page -= 1;
                 scroll_controller.scroll_to(ScrollPosition::Start, Direction::Vertical);
             }
         };
         let mut forward_page = move || {
-            let mut cur_page = cur_page.write();
+            let mut cur_page = cur_page_index.write();
             let total_pages: u32 = images.read().len() as u32;
             if *cur_page + 1 < total_pages {
                 *cur_page += 1;
@@ -146,7 +152,7 @@ impl Component for ChapterViewer {
             .horizontal()
             .min_height(Size::Fill)
             .width(Size::Fill)
-            .child(match images.read().get(*cur_page.read() as usize) {
+            .child(match images.read().get(*cur_page_index.read() as usize) {
                 Some(Some(img)) => image(img.clone())
                     .height(Size::px(img.image.borrow().height() as f32 * zoom))
                     .into_element(),
@@ -155,7 +161,11 @@ impl Component for ChapterViewer {
 
         let page_counter = label()
             .width(Size::Fill)
-            .text(format!("{}/{}", *cur_page.read() + 1, images.read().len()))
+            .text(format!(
+                "{}/{}",
+                *cur_page_index.read() + 1,
+                images.read().len()
+            ))
             .text_align(TextAlign::Center)
             .font_size(21);
 
