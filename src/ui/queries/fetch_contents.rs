@@ -1,4 +1,13 @@
-use freya::{prelude::*, query::QueryCapability, radio::RadioStation};
+use std::time::Duration;
+
+use freya::{
+    prelude::*,
+    query::{
+        Mutation, MutationCapability, QueriesStorage, Query, QueryCapability, use_mutation,
+        use_query,
+    },
+    radio::RadioStation,
+};
 
 use crate::{
     db::index::{content::Content, tags::IndexTag},
@@ -7,7 +16,7 @@ use crate::{
     ui::{AppChannel, AppState, ResourceState},
 };
 
-#[derive(Clone)]
+#[derive(Clone, Hash, PartialEq, Eq)]
 pub struct FetchContents<I: IndexTag> {
     _phantom: std::marker::PhantomData<I>,
 }
@@ -41,17 +50,3 @@ impl<I: IndexTag> FetchContents<I> {
         }
     }
 }
-
-impl<I: IndexTag> std::hash::Hash for FetchContents<I> {
-    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
-        std::hash::Hash::hash(&0, state);
-    }
-}
-
-impl<I: IndexTag> PartialEq for FetchContents<I> {
-    fn eq(&self, _: &Self) -> bool {
-        true
-    }
-}
-
-impl<I: IndexTag> Eq for FetchContents<I> {}
