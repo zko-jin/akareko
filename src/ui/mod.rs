@@ -15,7 +15,6 @@ use crate::{
         components::{layout_button, no_reaction_button},
         icons::ARROW_LEFT_ICON,
         router::RouteComponent,
-        theme::CUSTOM_THEME,
     },
 };
 
@@ -224,7 +223,7 @@ impl App for AkarekoApp {
             provide_context_for_scope_id(ctx.clone(), ScopeId::ROOT);
             ctx
         });
-        use_init_theme(|| CUSTOM_THEME);
+        use_init_theme(|| dark_theme());
         Layout
     }
 }

@@ -52,15 +52,12 @@ byteable-derive = { path = "./byteable-derive" }
 cxx = "1.0.186"
 bitflags = "2.9.4"
 anawt = { git = "https://github.com/pliduino/anawt.git", branch = "develop", optional = true }
-# iced = { version = "0.14.0", features = ["tokio", "image", "svg", "sipper"], optional = true }
-# iced_aw = { version = "0.13.0", optional = true, features = ["drop_down"] }
 bytes = "1.10.1"
 error_set = "0.9.0"
 rclite = "0.3.0"
 
 const_format = "0.2.35"
 image = "0.25.9"
-# rc-zip-tokio = "4.3.1"
 async_zip = { version = "0.0.18", features = ["tokio", "tokio-fs", "zstd", "lzma", "xz", "bzip2", "deflate"]}
 serde_bytes = "0.11.19"
 xorf = "0.12.0"
@@ -68,15 +65,10 @@ fastbloom = { version = "0.16.0", features = ["serde"] }
 num_enum = "0.7.5"
 strum = "0.28.0"
 strum_macros = "0.28.0"
-# tray-icon = "0.21.3"
-#trayicon = { git = "https://github.com/pliduino/trayicon-rs.git", branch = "master", features = ["iced"] }
 clap = { version = "4.5.60", features = ["derive"] }
-freya = { git = "https://github.com/marc2332/freya.git", branch = "main", features = ["router", "query", "tray", "radio", "calendar"] }
+freya = { git = "https://github.com/marc2332/freya.git", branch = "feat/hotreload", features = ["router", "query", "tray", "radio", "calendar"] }
 blocking = "1.6.2"
 freya-skia-safe = "0.96.0"
-# trayicon = "0.4.0"
-# diesel = { version = "2.3.6", features = ["sqlite"] }
-# diesel-async = { version = "0.7.4", features = ["sqlite", "bb8", "migrations"] }
 
 [dev-dependencies]
 criterion = { version = "0.5.1", features = ["async_tokio"] }
