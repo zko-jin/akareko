@@ -22,6 +22,11 @@ mod content {
 }
 pub use content::update_content_count::UpdateContentCount;
 
+mod torrent {
+    pub mod fetch_torrent_watchers;
+}
+pub use torrent::fetch_torrent_watchers::FetchTorrentWatchers;
+
 mod fetch_indexes;
 pub use fetch_indexes::FetchIndexes;
 mod fetch_contents;

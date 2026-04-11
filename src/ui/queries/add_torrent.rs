@@ -4,7 +4,10 @@ use freya::{prelude::*, query::*, radio::RadioStation};
 use crate::{
     db::Magnet,
     errors::TorrentError,
-    ui::{AppChannel, AppState, ResourceState, queries::FetchTorrentStatus},
+    ui::{
+        AppChannel, AppState, ResourceState,
+        queries::{FetchTorrentStatus, FetchTorrentWatchers},
+    },
 };
 
 #[derive(PartialEq, Eq, Clone, Hash)]
@@ -33,6 +36,7 @@ impl MutationCapability for AddTorrent {
     async fn on_settled(&self, _keys: &Self::Keys, result: &Result<Self::Ok, Self::Err>) {
         if let Ok(hash) = result {
             QueriesStorage::<FetchTorrentStatus>::invalidate_matching(hash.clone()).await;
+            QueriesStorage::<FetchTorrentWatchers>::invalidate_all().await;
         }
     }
 }

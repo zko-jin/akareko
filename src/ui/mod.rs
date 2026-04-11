@@ -217,7 +217,6 @@ impl App for AkarekoApp {
     fn render(&self) -> impl IntoElement {
         use_share_radio(move || self.radio_station);
         use_provide_context(|| self.router);
-        // use_provide_context(|| self.radio_station);
         use_hook(|| {
             let ctx = self.radio_station;
             provide_context_for_scope_id(ctx.clone(), ScopeId::ROOT);
@@ -252,7 +251,8 @@ impl Component for Layout {
                     )
                     .child(layout_button(Route::Home))
                     .child(layout_button(Route::MangaList))
-                    .child(layout_button(Route::Settings)),
+                    .child(layout_button(Route::Settings))
+                    .child(layout_button(Route::Torrents)),
             )
             .child(
                 rect()

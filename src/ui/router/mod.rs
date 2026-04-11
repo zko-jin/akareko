@@ -18,6 +18,8 @@ mod manga {
     mod chapter_viewer;
     pub use chapter_viewer::ChapterViewer;
 }
+mod torrents;
+use torrents::Torrents;
 
 use home::Home;
 use manga::{AddManga, AddMangaChapter, ChapterViewer, Manga, MangaList};
@@ -41,6 +43,7 @@ pub enum Route {
     // #[route("/chapter/:signature")]
     ChapterViewer { content: Content<MangaTag> },
     Settings,
+    Torrents,
 }
 
 impl Route {
@@ -53,6 +56,7 @@ impl Route {
             Route::AddMangaChapter { .. } => "",
             Route::ChapterViewer { .. } => "",
             Route::Settings => "Settings",
+            Route::Torrents => "Torrents",
         }
     }
 }
@@ -141,6 +145,7 @@ impl Component for Route {
             }
             .into_element(),
             Route::Settings => Settings.into_element(),
+            Route::Torrents => Torrents.into_element(),
         }
     }
 }
