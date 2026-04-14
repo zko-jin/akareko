@@ -1,4 +1,5 @@
 use tokio::io::{AsyncRead, AsyncReadExt, AsyncWrite, AsyncWriteExt};
+use uuid::Uuid;
 
 use crate::errors::{DecodeError, EncodeError};
 
@@ -38,6 +39,22 @@ impl Byteable for () {
 
     async fn decode<R: AsyncRead + Unpin + Send>(_reader: &mut R) -> Result<Self, DecodeError> {
         Ok(())
+    }
+}
+
+impl Byteable for Uuid {
+    async fn encode<W: AsyncWrite + Unpin + Send>(
+        &self,
+        writer: &mut W,
+    ) -> Result<(), EncodeError> {
+        let b = self.as_bytes();
+        b.encode(writer).await?;
+        Ok(())
+    }
+
+    async fn decode<R: AsyncRead + Unpin + Send>(reader: &mut R) -> Result<Self, DecodeError> {
+        let b = uuid::Bytes::decode(reader).await?;
+        Ok(Uuid::from_bytes(b))
     }
 }
 

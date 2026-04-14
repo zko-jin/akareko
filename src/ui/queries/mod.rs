@@ -18,8 +18,10 @@ pub use follow::follow_content::FollowContent;
 pub use follow::get_follow_content::GetFollowContent;
 
 mod content {
+    pub mod fetch_mangadex_chapters;
     pub mod update_content_count;
 }
+pub use content::fetch_mangadex_chapters::FetchMangadexChapters;
 pub use content::update_content_count::UpdateContentCount;
 
 mod torrent {
@@ -28,6 +30,11 @@ mod torrent {
 }
 pub use torrent::fetch_torrent_watchers::FetchTorrentWatchers;
 pub use torrent::remove_torrent::RemoveTorrent;
+
+mod index {
+    pub mod fetch_cover;
+}
+pub use index::fetch_cover::FetchCover;
 
 mod fetch_indexes;
 pub use fetch_indexes::FetchIndexes;

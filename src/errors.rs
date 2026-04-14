@@ -24,6 +24,10 @@ error_set::error_set! {
         IoError(std::io::Error)
     }
 
+    ApiError := {
+        MangadexApiError(mangadex_api::error::Error)
+    }
+
     TomlSaveError := TomlError || IoError
 
     I2PParseError := Base64Error

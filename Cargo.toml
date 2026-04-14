@@ -69,6 +69,10 @@ clap = { version = "4.5.60", features = ["derive"] }
 freya = { git = "https://github.com/marc2332/freya.git", branch = "feat/hotreload", features = ["router", "query", "tray", "radio", "calendar", "sdk"] }
 blocking = "1.6.2"
 freya-skia-safe = "0.96.0"
+reqwest = "0.13.2"
+mangadex-api =  { version = "4.2.1", features = ["utils"] }
+uuid = "1.23.0"
+mangadex-api-types-rust = "1.0.1"
 
 [dev-dependencies]
 criterion = { version = "0.5.1", features = ["async_tokio"] }

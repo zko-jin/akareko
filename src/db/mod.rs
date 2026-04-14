@@ -67,6 +67,12 @@ impl ToBytes for () {
     }
 }
 
+impl ToBytes for String {
+    fn to_bytes(&self) -> Vec<u8> {
+        self.clone().into_bytes()
+    }
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, Hash, SurrealValue)]
 #[serde(transparent)]
 pub struct Magnet(pub String);

@@ -6,10 +6,7 @@ use surrealdb_types::SurrealValue;
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use unicode_normalization::UnicodeNormalization;
 
-use crate::{
-    db::user::I2PAddress,
-    errors::{DecodeError, I2PParseError},
-};
+use crate::{db::user::I2PAddress, errors::I2PParseError};
 
 mod bloom_filter;
 mod byteable;

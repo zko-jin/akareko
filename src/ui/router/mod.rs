@@ -1,6 +1,6 @@
-use crate::db::index::Index;
 use crate::db::index::content::Content;
 use crate::db::index::tags::MangaTag;
+use crate::db::index::{Index, content::ExternalContent};
 use crate::helpers::LiFo;
 use freya::prelude::*;
 
@@ -35,13 +35,22 @@ pub enum Route {
     // #[route("/")]
     MangaList,
     // #[route("/:hash")]
-    Manga { index: Index<MangaTag> },
+    Manga {
+        index: Index<MangaTag>,
+    },
     // #[route("/add")]
     AddManga,
     // #[route("/:hash/add")]
-    AddMangaChapter { index: Index<MangaTag> },
+    AddMangaChapter {
+        index: Index<MangaTag>,
+    },
     // #[route("/chapter/:signature")]
-    ChapterViewer { content: Content<MangaTag> },
+    ChapterViewerInternal {
+        content: Content<MangaTag>,
+    },
+    ChapterViewerExternal {
+        content: Content<MangaTag, ExternalContent>,
+    },
     Settings,
     Torrents,
 }
@@ -54,7 +63,8 @@ impl Route {
             Route::Manga { .. } => "",
             Route::AddManga => "Add Manga",
             Route::AddMangaChapter { .. } => "",
-            Route::ChapterViewer { .. } => "",
+            Route::ChapterViewerInternal { .. } => "Chapter Viewer",
+            Route::ChapterViewerExternal { .. } => "Chapter Viewer",
             Route::Settings => "Settings",
             Route::Torrents => "Torrents",
         }
@@ -140,7 +150,11 @@ impl Component for Route {
                 index: index.clone(),
             }
             .into_element(),
-            Route::ChapterViewer { content } => ChapterViewer {
+            Route::ChapterViewerInternal { content } => ChapterViewer {
+                content: content.clone(),
+            }
+            .into_element(),
+            Route::ChapterViewerExternal { content } => ChapterViewer {
                 content: content.clone(),
             }
             .into_element(),

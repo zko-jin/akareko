@@ -212,8 +212,13 @@ impl std::hash::Hash for Event {
 #[cfg(test)]
 mod tests {
 
+    use uuid::Uuid;
+
     use crate::{
-        db::{Repositories, index::Index},
+        db::{
+            Repositories,
+            index::{Index, IndexLinks},
+        },
         types::PrivateKey,
     };
 
@@ -222,7 +227,15 @@ mod tests {
     #[tokio::test]
     async fn test_filter_events() {
         let repo = Repositories::in_memory().await;
-        let index = Index::<MangaTag>::new_signed("test".to_string(), 0, &PrivateKey::new());
+        let index = Index::<MangaTag>::new_signed(
+            "test".to_string(),
+            0,
+            IndexLinks {
+                myanimelist: None,
+                mangadex: Some(Uuid::parse_str("410d499a-f438-4a56-9ad4-eb90a4de5b39").unwrap()),
+            },
+            &PrivateKey::new(),
+        );
 
         repo.index().add_index(index.clone()).await.unwrap();
 

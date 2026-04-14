@@ -64,7 +64,16 @@ pub struct AkarekoConfig {
 
     is_relay: bool,
 
+    save_metadata_on_disk: bool,
+    pub metadata_source: MetadataSource,
+
     word_filter: WordFilter,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub enum MetadataSource {
+    LocalOnly,
+    Mangadex,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
@@ -131,6 +140,8 @@ impl Default for AkarekoConfig {
             max_client_connections: 8,
             scheduler_config: SchedulerConfig::default(),
             image_viewer_preferences: ImageViewerPreferences::default(),
+            save_metadata_on_disk: true,
+            metadata_source: MetadataSource::Mangadex,
             word_filter: WordFilter::None,
         }
     }

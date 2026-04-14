@@ -1,44 +1,37 @@
+use std::marker::PhantomData;
+
 use surrealdb_types::SurrealValue;
-use tokio::io::{AsyncReadExt as _, AsyncWriteExt as _};
 
 use crate::{
     db::{Magnet, ToBytes, index::tags::IndexTag},
+    helpers::Byteable,
     types::{Hash, PrivateKey, PublicKey, Signature, Timestamp},
 };
 
 // ==================== End Imports ====================
 
-#[derive(Debug, Default, Clone, SurrealValue, byteable_derive::Byteable)]
-pub enum ContentStatus {
-    Completed,
-    Hiatus,
-    Cancelled,
-    Releasing,
-    #[default]
-    Unknown,
+pub trait ContentType<I: IndexTag>: PartialEq + Eq + 'static {
+    type SourceType: std::fmt::Debug + Clone + SurrealValue + Byteable + ToBytes + PartialEq;
+}
+
+#[derive(Debug, Clone, SurrealValue, byteable_derive::Byteable, PartialEq, Eq)]
+pub struct InternalContent;
+#[derive(Debug, Clone, SurrealValue, byteable_derive::Byteable, PartialEq, Eq)]
+pub struct ExternalContent;
+
+impl<I: IndexTag> ContentType<I> for InternalContent {
+    type SourceType = String;
+}
+
+impl<I: IndexTag> ContentType<I> for ExternalContent {
+    type SourceType = I::ExternalSourceType;
 }
 
 #[derive(Debug, Clone, SurrealValue, byteable_derive::Byteable)]
-pub struct ContentLink {
-    /// Example: MyAnimeList, AniList
-    pub source: String,
-    pub link: String,
-
-    pub author: String,
-    pub artist: String,
-}
-
-#[derive(Debug, Default, Clone, SurrealValue, byteable_derive::Byteable)]
-pub struct ContentMetadata {
-    pub status: ContentStatus,
-    pub out_links: Vec<ContentLink>,
-}
-
-#[derive(Debug, Clone, SurrealValue, byteable_derive::Byteable)]
-pub struct Content<T: IndexTag> {
+pub struct Content<T: IndexTag, S: ContentType<T> = InternalContent> {
     #[surreal(rename = "id")]
     signature: Signature,
-    source: PublicKey,
+    poster: PublicKey,
 
     // Signed Fields
     index_hash: Hash,
@@ -46,7 +39,7 @@ pub struct Content<T: IndexTag> {
 
     // Only downloads the path from torrent
     pub magnet_link: Magnet,
-    pub path: String,
+    pub source: S::SourceType,
 
     pub title: String,
 
@@ -55,7 +48,6 @@ pub struct Content<T: IndexTag> {
     /// the last one.
     pub end: Option<f32>,
 
-    pub metadata: Option<ContentMetadata>,
     pub extra_metadata: T::ExtraMetadata,
 
     /// Each tag will use this differently, videos will count seconds, comics
@@ -68,7 +60,7 @@ pub struct Content<T: IndexTag> {
     #[byteable(skip)]
     pub count: u32,
 }
-impl<I: IndexTag> PartialEq for Content<I> {
+impl<I: IndexTag, S: ContentType<I>> PartialEq for Content<I, S> {
     fn eq(&self, other: &Self) -> bool {
         self.signature() == other.signature()
     }
@@ -80,14 +72,14 @@ impl<I: IndexTag> std::hash::Hash for Content<I> {
     }
 }
 
-impl<T: IndexTag> Content<T> {
+impl<T: IndexTag, S: ContentType<T>> Content<T, S> {
     pub fn new(
         signature: Signature,
-        source: PublicKey,
+        poster: PublicKey,
         index_hash: Hash,
         timestamp: Timestamp,
         magnet_link: Magnet,
-        path: String,
+        source: S::SourceType,
         title: String,
         enumeration: f32,
         end: Option<f32>,
@@ -95,15 +87,14 @@ impl<T: IndexTag> Content<T> {
     ) -> Self {
         Self {
             signature,
-            source,
+            poster,
             index_hash,
             timestamp,
             magnet_link,
-            path,
+            source,
             title,
             enumeration,
             end,
-            metadata: Default::default(),
             extra_metadata,
             progress: 0,
             count: 1,
@@ -114,7 +105,7 @@ impl<T: IndexTag> Content<T> {
         index_hash: &Hash,
         timestamp: &Timestamp,
         magnet_link: &Magnet,
-        path: &str,
+        source: &S::SourceType,
         title: &str,
         enumeration: f32,
         end: Option<f32>,
@@ -123,7 +114,7 @@ impl<T: IndexTag> Content<T> {
         let mut bytes: Vec<u8> = index_hash.inner().to_vec().to_vec();
         bytes.extend(timestamp.to_bytes());
         bytes.extend(magnet_link.0.as_bytes());
-        bytes.extend(path.as_bytes());
+        bytes.extend(source.to_bytes());
         bytes.extend(title.as_bytes());
         bytes.extend(enumeration.to_le_bytes());
         if let Some(end) = end {
@@ -137,7 +128,7 @@ impl<T: IndexTag> Content<T> {
         index_hash: Hash,
         timestamp: Timestamp,
         magnet_link: Magnet,
-        path: String,
+        source: S::SourceType,
         title: String,
         enumeration: f32,
         end: Option<f32>,
@@ -148,7 +139,7 @@ impl<T: IndexTag> Content<T> {
             &index_hash,
             &timestamp,
             &magnet_link,
-            &path,
+            &source,
             &title,
             enumeration,
             end,
@@ -162,7 +153,7 @@ impl<T: IndexTag> Content<T> {
             index_hash,
             timestamp,
             magnet_link,
-            path,
+            source,
             title,
             enumeration,
             end,
@@ -175,17 +166,17 @@ impl<T: IndexTag> Content<T> {
             &self.index_hash,
             &self.timestamp,
             &self.magnet_link,
-            &self.path,
+            &self.source,
             &self.title,
             self.enumeration,
             self.end,
             &self.extra_metadata,
         );
-        self.source.verify(&to_verify, &self.signature)
+        self.poster.verify(&to_verify, &self.signature)
     }
 
-    pub fn path(&self) -> &str {
-        &self.path
+    pub fn source(&self) -> &S::SourceType {
+        &self.source
     }
 
     pub fn title(&self) -> &str {

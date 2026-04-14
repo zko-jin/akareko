@@ -22,6 +22,7 @@ use crate::ui::{
 
 // use crate::ui::AppState;
 
+mod clients;
 mod config;
 mod db;
 mod errors;

@@ -1,5 +1,6 @@
-use std::{fmt::Debug, hash::Hash};
+use std::{fmt::Debug, hash::Hash, path::PathBuf};
 use surrealdb_types::SurrealValue;
+use uuid::Uuid;
 
 use crate::{
     db::{ToBytes, event::EventType},
@@ -12,6 +13,7 @@ pub trait IndexTag: Send + Clone + Debug + PartialEq + Eq + Hash + 'static {
     const TAG: &'static str; // Acts like table name
     const CONTENT_TABLE: &'static str;
     type ExtraMetadata: Send + Clone + Debug + ToBytes + Byteable + SurrealValue;
+    type ExternalSourceType: Debug + Clone + SurrealValue + Byteable + ToBytes + PartialEq;
 
     const EVENT_TYPE: EventType;
     const CONTENT_EVENT_TYPE: EventType;
@@ -23,10 +25,42 @@ pub trait IndexTag: Send + Clone + Debug + PartialEq + Eq + Hash + 'static {
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct MangaTag;
 
+#[derive(Debug, PartialEq, Clone, SurrealValue)]
+pub enum ChapterExternalSource {
+    MangaDex(Uuid),
+}
+
+impl Byteable for ChapterExternalSource {
+    async fn encode<W: tokio::io::AsyncWrite + Unpin + Send>(
+        &self,
+        writer: &mut W,
+    ) -> Result<(), crate::errors::EncodeError> {
+        todo!()
+    }
+
+    async fn decode<R: tokio::io::AsyncRead + Unpin + Send>(
+        reader: &mut R,
+    ) -> Result<Self, crate::errors::DecodeError>
+    where
+        Self: Sized,
+    {
+        todo!()
+    }
+}
+
+impl ToBytes for ChapterExternalSource {
+    fn to_bytes(&self) -> Vec<u8> {
+        match self {
+            Self::MangaDex(u) => u.as_bytes().to_vec(),
+        }
+    }
+}
+
 impl IndexTag for MangaTag {
     const TAG: &'static str = "mangas";
     const CONTENT_TABLE: &'static str = "manga_chapters";
     type ExtraMetadata = MangaChapter;
+    type ExternalSourceType = ChapterExternalSource;
 
     const EVENT_TYPE: EventType = EventType::Manga;
     const CONTENT_EVENT_TYPE: EventType = EventType::MangaContent;
@@ -62,6 +96,7 @@ impl IndexTag for NoTag {
 
     const CONTENT_TABLE: &'static str = "";
 
+    type ExternalSourceType = ();
     type ExtraMetadata = ();
 
     const EVENT_TYPE: EventType = EventType::Invalid;

@@ -1,4 +1,7 @@
+use std::path::PathBuf;
+
 use freya::{
+    elements::image::image,
     prelude::*,
     query::{Mutation, Query, QueryStateData, use_mutation, use_query},
 };
@@ -9,7 +12,9 @@ use crate::{
         DEFAULT_CORNER_RADIUS, DEFAULT_PAGE_PADDING, Route, RouteContext, UNKNOWN_COVER,
         components::{ContentEntry, Spacer, svg_button},
         icons::{self},
-        queries::{FetchContents, FollowContent, GetFollowContent},
+        queries::{
+            FetchContents, FetchCover, FetchMangadexChapters, FollowContent, GetFollowContent,
+        },
     },
 };
 
@@ -27,6 +32,13 @@ impl Component for Manga {
             self.index.hash().clone(),
             GetFollowContent::<MangaTag>::new(),
         ));
+        let cover_query = use_query(Query::new(self.index.out_links().clone(), FetchCover));
+
+        let mangadex_query = use_query(Query::new(
+            self.index.out_links().mangadex.unwrap(),
+            FetchMangadexChapters,
+        ));
+
         let bookmark_mut = use_mutation(Mutation::new(FollowContent::<MangaTag>::new()));
 
         let title = label().text(self.index.title().clone()).font_size(24);
@@ -77,16 +89,53 @@ impl Component for Manga {
         let add_chapter_button =
             svg_button(icons::PLUS_ICON, 32., Color::BLACK).on_press(add_chapter_press);
 
+        let cover = match &*cover_query.read().state() {
+            QueryStateData::Pending | QueryStateData::Loading { .. } => {
+                CircularLoader::new().into_element()
+            }
+            QueryStateData::Settled { res: Ok(img), .. } => {
+                image(img.clone()).width(Size::Fill).into_element()
+            }
+            QueryStateData::Settled { res: Err(_), .. } => {
+                ImageViewer::new(UNKNOWN_COVER).into_element()
+            }
+        };
+
+        #[derive(PartialEq)]
+        enum Source {
+            Local,
+            Mangadex,
+        }
+        let mut selected = use_state(|| Source::Local);
+        let source_selector = SegmentedButton::new().children([
+            ButtonSegment::new()
+                .selected(*selected.read() == Source::Local)
+                .on_press(move |_| {
+                    *selected.write() = Source::Local;
+                })
+                .child(format!("Local"))
+                .into(),
+            ButtonSegment::new()
+                .selected(*selected.read() == Source::Mangadex)
+                .on_press(move |_| {
+                    *selected.write() = Source::Mangadex;
+                })
+                .child(format!("Mangadex"))
+                .into(),
+        ]);
+
         let top = rect()
             .horizontal()
             .child(
-                ImageViewer::new(UNKNOWN_COVER)
+                rect()
+                    .child(cover)
+                    .overflow(Overflow::Clip)
                     .width(Size::px(400.))
                     .corner_radius(DEFAULT_CORNER_RADIUS),
             )
             .child(Spacer::horizontal(20.))
             .child(
-                rect().child(title).child(
+                rect().child(title).child(source_selector).child(
                     rect()
                         .horizontal()
                         .child(add_chapter_button)
@@ -94,20 +143,40 @@ impl Component for Manga {
                 ),
             );
 
-        let chapters = match &*contents_query.read().state() {
-            QueryStateData::Settled {
-                res: Ok(contents), ..
-            } => {
-                let chapters = contents
-                    .iter()
-                    .map(|c| ContentEntry::new(c.clone()).into_element());
-                rect().vertical().children(chapters).into_element()
-            }
-            QueryStateData::Pending | QueryStateData::Loading { .. } => {
-                rect().child(CircularLoader::new()).into_element()
-            }
-            QueryStateData::Settled { res: Err(e), .. } => {
-                rect().child(label().text(e.to_string())).into_element()
+        let chapters = {
+            match &*selected.read() {
+                Source::Local => match &*contents_query.read().state() {
+                    QueryStateData::Settled {
+                        res: Ok(contents), ..
+                    } => {
+                        let chapters = contents
+                            .iter()
+                            .map(|c| ContentEntry::new(c.clone()).into_element());
+                        rect().vertical().children(chapters).into_element()
+                    }
+                    QueryStateData::Pending | QueryStateData::Loading { .. } => {
+                        rect().child(CircularLoader::new()).into_element()
+                    }
+                    QueryStateData::Settled { res: Err(e), .. } => {
+                        rect().child(label().text(e.to_string())).into_element()
+                    }
+                },
+                Source::Mangadex => match &*mangadex_query.read().state() {
+                    QueryStateData::Settled {
+                        res: Ok(contents), ..
+                    } => {
+                        let chapters = contents
+                            .iter()
+                            .map(|c| ContentEntry::new(c.clone()).into_element());
+                        rect().vertical().children(chapters).into_element()
+                    }
+                    QueryStateData::Pending | QueryStateData::Loading { .. } => {
+                        rect().child(CircularLoader::new()).into_element()
+                    }
+                    QueryStateData::Settled { res: Err(e), .. } => {
+                        rect().child(label().text(e.to_string())).into_element()
+                    }
+                },
             }
         };
 
