@@ -1,13 +1,10 @@
-use freya::{
-    prelude::*,
-    query::{MutationCapability, QueriesStorage},
-    radio::RadioStation,
-};
+use freya::query::{MutationCapability, QueriesStorage};
 
 use crate::{
+    daemon::resource_state::ResourceState,
     db::index::{Index, content::Content, tags::IndexTag},
     errors::DatabaseError,
-    ui::{AppChannel, AppState, ResourceState},
+    ui::AppResources,
 };
 
 mod follow {
@@ -80,12 +77,7 @@ impl<I: IndexTag + 'static> MutationCapability for AddIndex<I> {
     type Keys = Index<I>;
 
     async fn run(&self, keys: &Self::Keys) -> Result<Self::Ok, Self::Err> {
-        let radio = try_consume_root_context::<RadioStation<AppState, AppChannel>>();
-        let Some(radio) = radio else {
-            return Err(DatabaseError::NotInitialized);
-        };
-
-        match &radio.read().repositories {
+        match &AppResources::get_repositories() {
             ResourceState::Loaded(r) => {
                 r.index().add_index(keys.clone()).await?;
                 Ok(())
@@ -132,12 +124,7 @@ impl<I: IndexTag + 'static> MutationCapability for AddIndexContent<I> {
     type Keys = Content<I>;
 
     async fn run(&self, keys: &Self::Keys) -> Result<Self::Ok, Self::Err> {
-        let radio = try_consume_root_context::<RadioStation<AppState, AppChannel>>();
-        let Some(radio) = radio else {
-            return Err(DatabaseError::NotInitialized);
-        };
-
-        match &radio.read().repositories {
+        match AppResources::get_repositories() {
             ResourceState::Loaded(r) => r.index().add_content(keys.clone()).await,
             _ => Err(DatabaseError::NotInitialized),
         }

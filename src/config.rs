@@ -4,11 +4,9 @@ use serde::{Deserialize, Serialize};
 use skerry::skerry;
 use tokio::fs;
 use tracing::{error, warn};
-use yosemite::RouterApi;
 
 use crate::{
     db::user::I2PAddress,
-    helpers::b32_from_pub_b64,
     types::{PrivateKey, PublicKey, Timestamp},
 };
 
@@ -47,19 +45,30 @@ impl KeyPair {
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 #[serde(default)]
+pub struct I2PRouterConfig {
+    sam_tcp_port: u16,
+    sam_udp_port: u16,
+}
+
+impl Default for I2PRouterConfig {
+    fn default() -> Self {
+        Self {
+            sam_tcp_port: DEFAULT_SAM_TCP_PORT,
+            sam_udp_port: DEFAULT_SAM_UDP_PORT,
+        }
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[serde(default)]
 pub struct AkarekoConfig {
     #[serde(flatten)]
     keypair: KeyPair,
-
-    sam_tcp_port: u16,
-    sam_udp_port: u16,
 
     eepsite_key: String,
     eepsite_address: I2PAddress,
 
     dev_mode: bool,
-
-    image_viewer_preferences: ImageViewerPreferences,
 
     max_client_connections: u16,
     scheduler_config: SchedulerConfig,
@@ -70,6 +79,20 @@ pub struct AkarekoConfig {
     pub metadata_source: MetadataSource,
 
     word_filter: WordFilter,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[serde(default)]
+pub struct Settings {
+    image_viewer_preferences: ImageViewerPreferences,
+}
+
+impl Default for Settings {
+    fn default() -> Self {
+        Self {
+            image_viewer_preferences: ImageViewerPreferences::default(),
+        }
+    }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
@@ -134,15 +157,12 @@ impl Default for AkarekoConfig {
     fn default() -> Self {
         Self {
             keypair: KeyPair::new(PrivateKey::new()),
-            sam_tcp_port: DEFAULT_SAM_TCP_PORT,
-            sam_udp_port: DEFAULT_SAM_UDP_PORT,
             eepsite_key: String::new(),
             eepsite_address: I2PAddress::new(""),
             dev_mode: false,
             is_relay: false,
             max_client_connections: 8,
             scheduler_config: SchedulerConfig::default(),
-            image_viewer_preferences: ImageViewerPreferences::default(),
             save_metadata_on_disk: true,
             metadata_source: MetadataSource::Mangadex,
             word_filter: WordFilter::None,
@@ -151,10 +171,126 @@ impl Default for AkarekoConfig {
 }
 
 #[skerry]
-impl AkarekoConfig {
+impl I2PRouterConfig {
     pub async fn save(&self) -> Result<(), e![TomlSer, TokioIo]> {
         let config = toml::to_string(self)?;
-        fs::write("config.toml", config).await.unwrap();
+        fs::write("i2p_router_config.toml", config).await.unwrap();
+        Ok(())
+    }
+
+    pub async fn load() -> Self {
+        let mut should_save = false;
+
+        let config = match fs::read_to_string("i2p_router_config.toml").await {
+            Ok(config_str) => match toml::from_str(&config_str) {
+                Ok(config) => config,
+                Err(e) => {
+                    error!("error loading router config: {}", e);
+                    I2PRouterConfig::default()
+                }
+            },
+            Err(e) => {
+                warn!("error opening router config file: {}", e);
+                should_save = true;
+                I2PRouterConfig::default()
+            }
+        };
+
+        if should_save {
+            match config.save().await {
+                Ok(_) => {}
+                Err(e) => {
+                    error!("error saving router config: {:?}", e);
+                }
+            }
+        }
+
+        config
+    }
+
+    pub fn sam_tcp_port(&self) -> u16 {
+        self.sam_tcp_port
+    }
+
+    pub fn set_sam_tcp_port(&mut self, port: u16) {
+        self.sam_tcp_port = port;
+    }
+
+    pub fn sam_udp_port(&self) -> u16 {
+        self.sam_udp_port
+    }
+
+    pub fn set_sam_udp_port(&mut self, port: u16) {
+        self.sam_udp_port = port;
+    }
+}
+
+#[skerry]
+impl Settings {
+    const FILE_NAME: &str = "settings.toml";
+
+    pub async fn save(&self) -> Result<(), e![TomlSer, TokioIo]> {
+        let config = toml::to_string(self)?;
+        fs::write(Self::FILE_NAME, config).await.unwrap();
+        Ok(())
+    }
+
+    /// can't fail, if the settings is missing or is invalid it will just be
+    /// created anyways
+    pub async fn load() -> Settings {
+        let mut should_save = false;
+
+        let settings = match fs::read_to_string(Self::FILE_NAME).await {
+            Ok(config_str) => match toml::from_str(&config_str) {
+                Ok(config) => config,
+                Err(e) => {
+                    error!("error loading settings: {}", e);
+                    Settings::default()
+                }
+            },
+            Err(e) => {
+                warn!("error opening settings file: {}", e);
+                should_save = true;
+                Settings::default()
+            }
+        };
+
+        if should_save {
+            match settings.save().await {
+                Ok(_) => {}
+                Err(e) => {
+                    error!("error saving settings: {:?}", e);
+                }
+            }
+        }
+
+        settings
+    }
+
+    pub fn image_viewer_preferences(&self) -> &ImageViewerPreferences {
+        &self.image_viewer_preferences
+    }
+
+    pub fn zoom(&self) -> u16 {
+        self.image_viewer_preferences.zoom.get()
+    }
+
+    pub fn set_zoom(&mut self, zoom: u16) {
+        match NonZero::new(zoom) {
+            Some(v) => self.image_viewer_preferences.zoom = v,
+            // SAFETY: 1 is not 0 duh
+            None => self.image_viewer_preferences.zoom = unsafe { NonZero::new_unchecked(1) },
+        }
+    }
+}
+
+#[skerry]
+impl AkarekoConfig {
+    const FILE_NAME: &str = "config.toml";
+
+    pub async fn save(&self) -> Result<(), e![TomlSer, TokioIo]> {
+        let config = toml::to_string(self)?;
+        fs::write(Self::FILE_NAME, config).await.unwrap();
         Ok(())
     }
 
@@ -163,7 +299,7 @@ impl AkarekoConfig {
     pub async fn load() -> AkarekoConfig {
         let mut should_save = false;
 
-        let config = match fs::read_to_string("config.toml").await {
+        let config = match fs::read_to_string(Self::FILE_NAME).await {
             Ok(config_str) => match toml::from_str(&config_str) {
                 Ok(config) => config,
                 Err(e) => {
@@ -182,7 +318,7 @@ impl AkarekoConfig {
             match config.save().await {
                 Ok(_) => {}
                 Err(e) => {
-                    error!("error saving config: ");
+                    error!("error saving config: {:?}", e);
                 }
             }
         }
@@ -205,38 +341,6 @@ impl AkarekoConfig {
 
     pub fn scheduler_config(&self) -> &SchedulerConfig {
         &self.scheduler_config
-    }
-
-    pub fn sam_tcp_port(&self) -> u16 {
-        self.sam_tcp_port
-    }
-
-    pub fn set_sam_tcp_port(&mut self, port: u16) {
-        self.sam_tcp_port = port;
-    }
-
-    pub fn sam_udp_port(&self) -> u16 {
-        self.sam_udp_port
-    }
-
-    pub fn set_sam_udp_port(&mut self, port: u16) {
-        self.sam_udp_port = port;
-    }
-
-    pub fn image_viewer_preferences(&self) -> &ImageViewerPreferences {
-        &self.image_viewer_preferences
-    }
-
-    pub fn zoom(&self) -> u16 {
-        self.image_viewer_preferences.zoom.get()
-    }
-
-    pub fn set_zoom(&mut self, zoom: u16) {
-        match NonZero::new(zoom) {
-            Some(v) => self.image_viewer_preferences.zoom = v,
-            // SAFETY: 1 is not 0 duh
-            None => self.image_viewer_preferences.zoom = unsafe { NonZero::new_unchecked(1) },
-        }
     }
 
     pub fn public_key(&self) -> &PublicKey {

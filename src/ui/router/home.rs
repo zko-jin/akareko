@@ -1,12 +1,13 @@
-use crate::ui::{AppChannel, DEFAULT_CORNER_RADIUS, DEFAULT_PAGE_PADDING, ResourceState, icons};
-use freya::{prelude::*, radio::use_radio};
+use crate::{
+    daemon::resource_state::ResourceState,
+    ui::{AppResources, DEFAULT_CORNER_RADIUS, DEFAULT_PAGE_PADDING, icons},
+};
+use freya::prelude::*;
 
 #[derive(PartialEq)]
 pub struct Home;
 impl Component for Home {
     fn render(&self) -> impl IntoElement {
-        let radio = use_radio(AppChannel::Status);
-
         fn render_status<T, E>(name: &'static str, state: &ResourceState<T, E>) -> Element {
             let icon = match state {
                 ResourceState::Pending => svg(icons::CIRCLE)
@@ -50,25 +51,25 @@ impl Component for Home {
             .width(Size::px(150.))
             .corner_radius(DEFAULT_CORNER_RADIUS)
             .children([
-                render_status("Repositories", &radio.read().repositories),
+                render_status("Repositories", &AppResources::get_repositories()),
                 rect()
                     .width(Size::Fill)
                     .height(Size::px(2.))
                     .background(Color::GRAY)
                     .into_element(),
-                render_status("Torrent Client", &radio.read().torrent_client),
+                render_status("Torrent Client", &AppResources::get_torrent_client()),
+                // rect()
+                //     .width(Size::Fill)
+                //     .height(Size::px(2.))
+                //     .background(Color::GRAY)
+                //     .into_element(),
+                // render_status("Server", &AppResources::get_server()),
                 rect()
                     .width(Size::Fill)
                     .height(Size::px(2.))
                     .background(Color::GRAY)
                     .into_element(),
-                render_status("Server", &radio.read().server),
-                rect()
-                    .width(Size::Fill)
-                    .height(Size::px(2.))
-                    .background(Color::GRAY)
-                    .into_element(),
-                render_status("Client", &radio.read().client),
+                render_status("Client", &AppResources::get_client()),
             ]);
 
         rect().padding(DEFAULT_PAGE_PADDING).child(

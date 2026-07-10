@@ -1,12 +1,13 @@
 use std::marker::PhantomData;
 
-use freya::{prelude::*, query::*, radio::RadioStation};
+use freya::query::*;
 
 use crate::{
+    daemon::resource_state::ResourceState,
     db::{follow_index::IndexFollow, index::tags::IndexTag},
     errors::DatabaseError,
     types::{Hash, Timestamp},
-    ui::{AppChannel, AppState, ResourceState, queries::GetFollowContent},
+    ui::{AppResources, queries::GetFollowContent},
 };
 
 #[derive(PartialEq, Eq, Clone, Hash)]
@@ -24,12 +25,7 @@ impl<I: IndexTag> MutationCapability for FollowContent<I> {
     type Keys = (Hash, bool);
 
     async fn run(&self, keys: &Self::Keys) -> Result<Self::Ok, Self::Err> {
-        let radio = try_consume_root_context::<RadioStation<AppState, AppChannel>>();
-        let Some(radio) = radio else {
-            return Err(DatabaseError::NotInitialized);
-        };
-
-        match &radio.read().repositories {
+        match AppResources::get_repositories() {
             ResourceState::Loaded(r) => {
                 if keys.1 {
                     r.index_follow()

@@ -77,6 +77,7 @@ const_panic = "0.2.15"
 postcard = { version = "1.1.3", features = ["use-std","alloc"] }
 emissary-core = "0.4.0"
 emissary-util = "0.4.0"
+cfg-if = "1.0.4"
 
 [dev-dependencies]
 criterion = { version = "0.5.1", features = ["async_tokio"] }
@@ -89,12 +90,13 @@ name = "db_benchmark"
 harness = false
 
 [features]
-default = ["surrealdb", "bin"]
+default = ["surrealdb", "bin", "ui"]
 bin = ["dep:anawt"]
 lto = ["anawt/lto"]
 surrealdb = []
 sqlite = ["diesel"]
 diesel = []
+ui = []
 dev = ["freya/devtools", "freya/hotreload"]
 
 [profile.release]

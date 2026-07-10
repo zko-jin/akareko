@@ -5,7 +5,6 @@ use freya::{
     elements::image::{ImageHolder, image},
     prelude::*,
     query::{Mutation, use_mutation},
-    radio::use_radio,
 };
 use futures::AsyncReadExt as _;
 use mangadex_api::utils::download::chapter::DownloadMode;
@@ -13,13 +12,12 @@ use tokio::{fs::File, io::BufReader};
 use tracing::error;
 
 use crate::{
-    config::ImageVisualizationType,
+    config::{ImageVisualizationType, Settings},
     db::index::{
         content::{Content, ContentType, ExternalContent, InternalContent},
         tags::{ChapterExternalSource, IndexTag, MangaTag},
     },
     ui::{
-        AppChannel, ResourceState,
         components::AkLayers,
         queries::{UpdateContentCount, UpdateContentProgress},
     },
@@ -29,6 +27,7 @@ use crate::{
 pub struct ChapterViewer<S: ContentType<MangaTag> + ImageLoaderExt<S>> {
     pub content: Content<MangaTag, S>,
 }
+
 impl<S: ContentType<MangaTag> + ImageLoaderExt<S>> Component for ChapterViewer<S> {
     fn render(&self) -> impl IntoElement {
         let images = use_state(Vec::<Option<ImageHolder>>::new);
@@ -47,7 +46,7 @@ impl<S: ContentType<MangaTag> + ImageLoaderExt<S>> Component for ChapterViewer<S
 
         S::start_loader(&self.content, images);
 
-        let mut config = use_radio(AppChannel::Config);
+        let mut settings: State<Settings> = use_consume();
 
         let mut scroll_controller = use_scroll_controller(ScrollConfig::default);
 
@@ -86,10 +85,8 @@ impl<S: ContentType<MangaTag> + ImageLoaderExt<S>> Component for ChapterViewer<S
                 // On submit
                 Code::ArrowLeft => {
                     e.stop_propagation();
-                    match config
+                    match settings
                         .read()
-                        .config
-                        .unwrap_ref()
                         .image_viewer_preferences()
                         .visualization_type
                     {
@@ -100,10 +97,8 @@ impl<S: ContentType<MangaTag> + ImageLoaderExt<S>> Component for ChapterViewer<S
                 }
                 Code::ArrowRight => {
                     e.stop_propagation();
-                    match config
+                    match settings
                         .read()
-                        .config
-                        .unwrap_ref()
                         .image_viewer_preferences()
                         .visualization_type
                     {
@@ -124,32 +119,21 @@ impl<S: ContentType<MangaTag> + ImageLoaderExt<S>> Component for ChapterViewer<S
                 }
                 Code::Equal if e.modifiers.ctrl() => {
                     e.stop_propagation();
-                    match &mut config.write().config {
-                        ResourceState::Loaded(c) => {
-                            c.set_zoom(c.zoom() + 5);
-                        }
-                        _ => {}
-                    }
+                    let mut settings = settings.write();
+                    let cur_zoom = settings.zoom();
+                    settings.set_zoom(cur_zoom + 5);
                 }
                 Code::Minus if e.modifiers.ctrl() => {
                     e.stop_propagation();
-                    match &mut config.write().config {
-                        ResourceState::Loaded(c) => {
-                            c.set_zoom(c.zoom() - 5);
-                        }
-                        _ => {}
-                    }
+                    let mut settings = settings.write();
+                    let cur_zoom = settings.zoom();
+                    settings.set_zoom(cur_zoom - 5);
                 }
                 _ => {}
             }
         };
 
-        let zoom = config
-            .read()
-            .config
-            .unwrap_ref()
-            .image_viewer_preferences()
-            .zoom();
+        let zoom = settings.read().image_viewer_preferences().zoom();
 
         let image_viewer = rect()
             .center()
@@ -244,7 +228,7 @@ impl<S: ContentType<MangaTag> + ImageLoaderExt<S>> Component for ChapterViewer<S
     }
 }
 
-trait ImageLoaderExt<S: ContentType<MangaTag>> {
+pub trait ImageLoaderExt<S: ContentType<MangaTag>> {
     fn start_loader(
         content: &Content<MangaTag, S>,
         images: State<Vec<Option<ImageHolder>>>,

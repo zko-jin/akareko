@@ -214,6 +214,7 @@ dependencies = [
  "bitflags 2.11.0",
  "blocking",
  "bytes",
+ "cfg-if",
  "clap",
  "config",
  "const_format",

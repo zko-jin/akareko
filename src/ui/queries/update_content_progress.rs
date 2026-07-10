@@ -1,10 +1,11 @@
-use freya::{prelude::*, query::*, radio::RadioStation};
+use freya::query::*;
 
 use crate::{
+    daemon::resource_state::ResourceState,
     db::index::{content::Content, tags::IndexTag},
     errors::DatabaseError,
     types::Signature,
-    ui::{AppChannel, AppState, ResourceState, queries::FetchContents},
+    ui::{AppResources, queries::FetchContents},
 };
 
 #[derive(PartialEq, Eq, Clone, Hash)]
@@ -26,12 +27,7 @@ impl<I: IndexTag> MutationCapability for UpdateContentProgress<I> {
     type Keys = (Signature, u32);
 
     async fn run(&self, keys: &Self::Keys) -> Result<Self::Ok, Self::Err> {
-        let radio = try_consume_root_context::<RadioStation<AppState, AppChannel>>();
-        let Some(radio) = radio else {
-            return Err(DatabaseError::NotInitialized);
-        };
-
-        match &radio.read().repositories {
+        match &AppResources::get_repositories() {
             ResourceState::Loaded(r) => {
                 r.index()
                     .update_content_progress::<I>(keys.0.clone(), keys.1)

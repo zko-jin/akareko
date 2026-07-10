@@ -3,7 +3,7 @@ use akareko_lib::{
         Repositories,
         user::{I2PAddress, User},
     },
-    types::{PublicKey, Signature, String8, Timestamp},
+    types::{PublicKey, Signature, Timestamp},
 };
 use criterion::{BatchSize, BenchmarkId, Criterion, criterion_group, criterion_main};
 use rand::Rng;
@@ -18,7 +18,7 @@ fn rand_user_vec(size: usize) -> Vec<User> {
         rng.fill(&mut bytes);
 
         User::new(
-            String8::new("Test User".to_string()).unwrap(),
+            "Test User".to_string(),
             Timestamp::new(0),
             unsafe { PublicKey::from_bytes_unchecked(bytes) },
             Signature::empty(),

@@ -2,5 +2,7 @@
 /data
 /database
 config.toml
+settings.toml
+i2p_router_config.toml
 /test
 .direnv

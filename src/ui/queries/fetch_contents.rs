@@ -1,10 +1,11 @@
-use freya::{prelude::*, query::QueryCapability, radio::RadioStation};
+use freya::query::QueryCapability;
 
 use crate::{
+    daemon::resource_state::ResourceState,
     db::index::{content::Content, tags::IndexTag},
     errors::DatabaseError,
     types::Hash,
-    ui::{AppChannel, AppState, ResourceState},
+    ui::AppResources,
 };
 
 #[derive(Clone, Hash, PartialEq, Eq)]
@@ -18,12 +19,7 @@ impl<I: IndexTag + 'static> QueryCapability for FetchContents<I> {
     type Keys = Hash;
 
     async fn run(&self, keys: &Self::Keys) -> Result<Self::Ok, Self::Err> {
-        let radio = try_consume_root_context::<RadioStation<AppState, AppChannel>>();
-        let Some(radio) = radio else {
-            return Err(DatabaseError::NotInitialized);
-        };
-
-        match &radio.read().repositories.clone() {
+        match AppResources::get_repositories() {
             ResourceState::Loaded(r) => {
                 r.index()
                     .get_filtered_index_contents(keys.clone(), None, None)

@@ -3,12 +3,12 @@ use std::time::Duration;
 use freya::{
     prelude::*,
     query::{Mutation, use_mutation},
-    radio::use_radio,
 };
 
 use crate::{
+    daemon::resource_state::ResourceState,
     db::index::{Index, IndexLinks, tags::MangaTag},
-    ui::{AppChannel, ResourceState, queries::AddIndex},
+    ui::{AppResources, queries::AddIndex},
 };
 
 #[derive(PartialEq)]
@@ -17,7 +17,6 @@ impl Component for AddManga {
     fn render(&self) -> impl IntoElement {
         let title = use_state(String::new);
         let mangadex_id = use_state(String::new);
-        let state = use_radio(AppChannel::Config);
 
         let mut selected = use_state(|| None::<CalendarDate>);
         let mut view_date = use_state(|| CalendarDate::new(2025, 1, 1));
@@ -38,7 +37,7 @@ impl Component for AddManga {
         rect()
             .child(Input::new(title).placeholder("Title"))
             .child(Button::new().child("Add").on_press(move |_| {
-                if let ResourceState::Loaded(c) = &state.read().config {
+                if let ResourceState::Loaded(c) = AppResources::get_config() {
                     let mangadex = mangadex_id.read().cloned();
                     let mangadex = if mangadex.is_empty() {
                         None

@@ -23,7 +23,7 @@ use torrents::Torrents;
 
 use home::Home;
 use manga::{AddManga, AddMangaChapter, ChapterViewer, Manga, MangaList};
-use settings::Settings;
+use settings::SettingsPage;
 
 #[derive(Clone, PartialEq)]
 pub enum Route {
@@ -158,7 +158,7 @@ impl Component for Route {
                 content: content.clone(),
             }
             .into_element(),
-            Route::Settings => Settings.into_element(),
+            Route::Settings => SettingsPage.into_element(),
             Route::Torrents => Torrents.into_element(),
         }
     }

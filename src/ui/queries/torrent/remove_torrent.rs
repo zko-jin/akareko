@@ -1,10 +1,11 @@
 use anawt::{InfoHash, RemoveFlags};
-use freya::{prelude::*, query::*, radio::RadioStation};
+use freya::query::*;
 
 use crate::{
+    daemon::resource_state::ResourceState,
     errors::TorrentError,
     ui::{
-        AppChannel, AppState, ResourceState,
+        AppResources,
         queries::{FetchTorrentStatus, FetchTorrentWatchers},
     },
 };
@@ -18,12 +19,7 @@ impl MutationCapability for RemoveTorrent {
     type Keys = (InfoHash, RemoveFlags);
 
     async fn run(&self, keys: &Self::Keys) -> Result<Self::Ok, Self::Err> {
-        let radio = try_consume_root_context::<RadioStation<AppState, AppChannel>>();
-        let Some(radio) = radio else {
-            return Err(TorrentError::NotInitialized);
-        };
-
-        match &radio.read().torrent_client {
+        match AppResources::get_torrent_client() {
             ResourceState::Loaded(c) => c
                 .remove_torrent(keys.0, keys.1)
                 .await

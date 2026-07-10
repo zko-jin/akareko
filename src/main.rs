@@ -1,8 +1,6 @@
 #![feature(negative_impls)]
 #![feature(auto_traits)]
 
-use std::path::PathBuf;
-
 use clap::Parser;
 use freya::{
     prelude::*,
@@ -12,28 +10,30 @@ use freya::{
         menu::{Menu, MenuEvent, MenuItem},
     },
 };
-use futures::executor::block_on;
 use tracing::info;
 use tracing_subscriber::{EnvFilter, Layer, fmt, layer::SubscriberExt, util::SubscriberInitExt};
 
-use crate::ui::{
-    AkarekoApp, AppChannel, AppState, AppWindowType, RouteContext,
-    app_manager::{AppManager, Event},
+use crate::{
+    config::Settings,
+    daemon::{AppManager, Event},
+    ui::{AkarekoApp, AppChannel, AppState, AppWindowType, RouteContext},
 };
 
 mod clients;
 mod config;
+mod daemon;
 mod db;
 mod errors;
 mod helpers;
 mod server;
 mod types;
+#[cfg(feature = "ui")]
 mod ui;
 
 #[derive(Parser)]
 #[command(author, version, about)]
 struct CliArgs {
-    ///   Start the application in minimized state.
+    /// Start the application in minimized state.
     #[arg(long)]
     minimized: bool,
 }
@@ -68,9 +68,6 @@ fn main() -> Result<(), ()> {
         .build()
         .unwrap();
 
-    // Enter the Tokio context so its APIs (channels, timers, etc.) work.
-    let _rt = rt.enter();
-
     let tray_icon = || {
         const ICON: &'static [u8] = include_bytes!("../assets/tray_icon.ico");
         let tray_menu = Menu::new();
@@ -92,14 +89,21 @@ fn main() -> Result<(), ()> {
 
     let mut app_state = AppState::new();
     if !args.minimized {
-        app_state.windows_state.try_add_window(AppWindowType::Main);
+        app_state.window_state.try_add_window(AppWindowType::Main);
     }
     let mut radio_station = RadioStation::<AppState, AppChannel>::create_global(app_state);
 
     let router = RouteContext::create_global();
 
+    let settings = rt.block_on(Settings::load());
+    let settings = State::create_global(settings);
+
+    // Enter the Tokio context so its APIs (channels, timers, etc.) work.
+    let _rt = rt.enter();
+
     let (manager, manager_tx) = AppManager::new(radio_station);
-    let app = AkarekoApp::new(radio_station, router);
+    let resources = manager.resources();
+    let app = AkarekoApp::new(router, radio_station, resources, settings);
 
     let manager_tx_tray = manager_tx.clone();
     let tray_handler = move |ev, mut ctx: RendererContext| match ev {
@@ -107,7 +111,7 @@ fn main() -> Result<(), ()> {
             // TODO: Deduplicate code
             let can_open_window = radio_station
                 .write_channel(AppChannel::Window)
-                .windows_state
+                .window_state
                 .try_add_window(AppWindowType::Main);
 
             if can_open_window {
@@ -121,7 +125,7 @@ fn main() -> Result<(), ()> {
         TrayEvent::Menu(MenuEvent { id }) if id == "open" => {
             let can_open_window = radio_station
                 .write_channel(AppChannel::Window)
-                .windows_state
+                .window_state
                 .try_add_window(AppWindowType::Main);
 
             if can_open_window {
@@ -133,19 +137,23 @@ fn main() -> Result<(), ()> {
             }
         }
         TrayEvent::Menu(MenuEvent { id }) if id == "quit" => {
-            match &radio_station.peek().torrent_client {
-                ui::ResourceState::Loaded(client) => {
-                    let _ = block_on(client.save(PathBuf::from("./data/torrents")));
-                }
-                _ => {}
-            };
+            // match &radio_station.peek().torrent_client() {
+            //     ui::ResourceState::Loaded(client) => {
+            //         let _ = block_on(client.save(PathBuf::from("./data/torrents")));
+            //     }
+            //     _ => {}
+            // };
             ctx.exit();
         }
         _ => {}
     };
     let mut launch_config = LaunchConfig::new()
         .with_tray(tray_icon, tray_handler)
-        .with_future(async move |_| manager.run_manager().await)
+        .with_future(async move |_| {
+            let thread_id = std::thread::current().id();
+            println!("Task is running on OS Thread: {:?}", thread_id);
+            manager.run_manager().await;
+        })
         .with_exit_on_close(false);
 
     if !args.minimized {

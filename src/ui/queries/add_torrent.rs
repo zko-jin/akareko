@@ -1,11 +1,12 @@
 use anawt::InfoHash;
-use freya::{prelude::*, query::*, radio::RadioStation};
+use freya::query::*;
 
 use crate::{
+    daemon::resource_state::ResourceState,
     db::Magnet,
     errors::TorrentError,
     ui::{
-        AppChannel, AppState, ResourceState,
+        AppResources,
         queries::{FetchTorrentStatus, FetchTorrentWatchers},
     },
 };
@@ -19,12 +20,7 @@ impl MutationCapability for AddTorrent {
     type Keys = (Magnet, String /* path */);
 
     async fn run(&self, keys: &Self::Keys) -> Result<Self::Ok, Self::Err> {
-        let radio = try_consume_root_context::<RadioStation<AppState, AppChannel>>();
-        let Some(radio) = radio else {
-            return Err(TorrentError::NotInitialized);
-        };
-
-        match &radio.read().torrent_client {
+        match AppResources::get_torrent_client() {
             ResourceState::Loaded(c) => c
                 .add_magnet(&keys.0.0, &keys.1)
                 .await

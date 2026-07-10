@@ -1,11 +1,14 @@
+use std::convert::Infallible;
+
 use anawt::TorrentClient;
 use freya::{
     prelude::*,
-    radio::{RadioChannel, RadioStation, use_share_radio},
+    radio::{RadioChannel, RadioStation},
 };
 
 use crate::{
-    config::AkarekoConfig,
+    config::{AkarekoConfig, I2PRouterConfig, Settings},
+    daemon::resource_state::AppResources,
     db::{
         Repositories,
         index::{Index, tags::IndexTag},
@@ -18,7 +21,6 @@ use crate::{
     },
 };
 
-pub mod app_manager;
 mod components;
 mod icons;
 mod queries;
@@ -85,63 +87,44 @@ impl<I: IndexTag + 'static> Component for IndexComponent<I> {
 pub struct AkarekoApp {
     radio_station: RadioStation<AppState, AppChannel>,
     router: RouteContext,
+    resources: AppResources,
+    settings: State<Settings>,
 }
 
 impl AkarekoApp {
-    pub fn new(radio_station: RadioStation<AppState, AppChannel>, router: RouteContext) -> Self {
+    pub fn new(
+        router: RouteContext,
+        radio_station: RadioStation<AppState, AppChannel>,
+        resources: AppResources,
+        settings: State<Settings>,
+    ) -> Self {
         AkarekoApp {
             radio_station,
             router,
+            resources,
+            settings,
         }
     }
 }
 
 #[derive(PartialEq, Eq, Clone, Debug, Copy, Hash)]
 pub enum AppChannel {
-    Status,
-    Config,
-    Repository,
-    Server,
-    Client,
-    TorrentClient,
-
     Window,
 }
 
-pub enum ResourceState<T, E> {
-    Pending,
-    Error(E),
-    Loading,
-    Loaded(T),
+impl RadioChannel<AppState> for AppChannel {}
+
+pub trait Resource: Clone + Send + 'static {}
+impl<T: Clone + Send + 'static> Resource for T {}
+
+pub struct AppState {
+    pub window_state: AppWindowState,
 }
 
-impl<T, E> ResourceState<T, E> {
-    pub fn unwrap_ref(&self) -> &T {
-        match self {
-            ResourceState::Pending => panic!("ResourceState::Pending"),
-            ResourceState::Error(_) => panic!("ResourceState::Error"),
-            ResourceState::Loading => panic!("ResourceState::Loading"),
-            ResourceState::Loaded(t) => t,
-        }
-    }
-
-    pub fn mut_unwrap_ref(&mut self) -> &mut T {
-        match self {
-            ResourceState::Pending => panic!("ResourceState::Pending"),
-            ResourceState::Error(_) => panic!("ResourceState::Error"),
-            ResourceState::Loading => panic!("ResourceState::Loading"),
-            ResourceState::Loaded(t) => t,
-        }
-    }
-}
-
-impl<T: Clone, E: Clone> Clone for ResourceState<T, E> {
-    fn clone(&self) -> Self {
-        match self {
-            ResourceState::Pending => ResourceState::Pending,
-            ResourceState::Error(e) => ResourceState::Error(e.clone()),
-            ResourceState::Loading => ResourceState::Loading,
-            ResourceState::Loaded(t) => ResourceState::Loaded(t.clone()),
+impl AppState {
+    pub fn new() -> Self {
+        AppState {
+            window_state: AppWindowState::new(),
         }
     }
 }
@@ -149,15 +132,6 @@ impl<T: Clone, E: Clone> Clone for ResourceState<T, E> {
 #[derive(Clone, Copy, PartialEq, Eq)]
 pub enum AppWindowType {
     Main,
-}
-
-pub struct AppState {
-    pub config: ResourceState<AkarekoConfig, ()>,
-    pub repositories: ResourceState<Repositories, ()>,
-    pub torrent_client: ResourceState<TorrentClient, ()>,
-    pub server: ResourceState<(), ()>,
-    pub client: ResourceState<ClientPool, ()>,
-    pub windows_state: AppWindowState,
 }
 
 pub struct AppWindowState {
@@ -187,41 +161,21 @@ impl AppWindowState {
     }
 }
 
-impl AppState {
-    pub fn new() -> Self {
-        Self {
-            config: ResourceState::Pending,
-            repositories: ResourceState::Pending,
-            torrent_client: ResourceState::Pending,
-            server: ResourceState::Pending,
-            client: ResourceState::Pending,
-            windows_state: AppWindowState::new(),
-        }
-    }
-}
-
-impl RadioChannel<AppState> for AppChannel {
-    fn derive_channel(self, _radio: &AppState) -> Vec<Self> {
-        match self {
-            AppChannel::TorrentClient
-            | AppChannel::Config
-            | AppChannel::Repository
-            | AppChannel::Server
-            | AppChannel::Client => vec![self, AppChannel::Status],
-            _ => vec![self],
-        }
-    }
-}
-
 impl App for AkarekoApp {
     fn render(&self) -> impl IntoElement {
-        use_share_radio(move || self.radio_station);
+        freya::radio::use_share_radio(move || self.radio_station);
+        use_provide_context(|| self.settings);
+        let thread_id = std::thread::current().id();
+        println!("App is running on OS Thread: {:?}", thread_id);
+
         use_provide_context(|| self.router);
-        use_hook(|| {
-            let ctx = self.radio_station;
-            provide_context_for_scope_id(ctx.clone(), ScopeId::ROOT);
-            ctx
-        });
+        self.resources.register_context();
+
+        // use_hook(|| {
+        //     let ctx = self.radio_station;
+        //     provide_context_for_scope_id(ctx.clone(), ScopeId::ROOT);
+        //     ctx
+        // });
         use_init_theme(|| light_theme());
         Layout
     }

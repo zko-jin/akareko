@@ -7,4 +7,4 @@ pub mod errors;
 pub mod helpers;
 pub mod server;
 pub mod types;
-pub mod ui;
+// pub mod ui;
