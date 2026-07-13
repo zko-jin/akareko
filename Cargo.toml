@@ -91,6 +91,7 @@ harness = false
 
 [features]
 default = ["surrealdb", "bin", "ui"]
+headless = ["surrealdb", "bin"]
 bin = ["dep:anawt"]
 lto = ["anawt/lto"]
 surrealdb = []

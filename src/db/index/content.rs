@@ -54,7 +54,7 @@ pub struct Content<T: IndexTag, S: ContentType<T> = InternalContent> {
     /// the last one.
     pub end: Option<f32>,
 
-    pub extra_metadata: T::ExtraMetadata,
+    pub extra_metadata: T::ExtraContentMetadata,
 
     /// Each tag will use this differently, videos will count seconds, comics
     /// will count pages, etc.
@@ -89,7 +89,7 @@ impl<T: IndexTag, S: ContentType<T>> Content<T, S> {
         title: String,
         enumeration: f32,
         end: Option<f32>,
-        extra_metadata: T::ExtraMetadata,
+        extra_metadata: T::ExtraContentMetadata,
     ) -> Self {
         Self {
             signature,
@@ -115,7 +115,7 @@ impl<T: IndexTag, S: ContentType<T>> Content<T, S> {
         title: &str,
         enumeration: f32,
         end: Option<f32>,
-        extra_metadata: &T::ExtraMetadata,
+        extra_metadata: &T::ExtraContentMetadata,
     ) -> Vec<u8> {
         let mut bytes: Vec<u8> = index_hash.inner().to_vec().to_vec();
         bytes.extend(timestamp.to_bytes());
@@ -138,7 +138,7 @@ impl<T: IndexTag, S: ContentType<T>> Content<T, S> {
         title: String,
         enumeration: f32,
         end: Option<f32>,
-        extra_metadata: T::ExtraMetadata,
+        extra_metadata: T::ExtraContentMetadata,
         priv_key: &PrivateKey,
     ) -> Self {
         let to_sign = Self::id_bytes(
@@ -197,7 +197,7 @@ impl<T: IndexTag, S: ContentType<T>> Content<T, S> {
         self.end
     }
 
-    pub fn extra_metadata(&self) -> &T::ExtraMetadata {
+    pub fn extra_metadata(&self) -> &T::ExtraContentMetadata {
         &self.extra_metadata
     }
 

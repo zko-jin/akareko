@@ -32,7 +32,7 @@ where
         writer: &mut W,
     ) -> Result<(), EncodeError> {
         let bytes = postcard::to_allocvec(&self).unwrap();
-        writer.write_all(&bytes);
+        writer.write_all(&bytes).await?;
         Ok(())
     }
 }

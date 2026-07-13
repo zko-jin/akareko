@@ -5,6 +5,8 @@ use std::{
     time::Duration,
 };
 
+use tracing::info;
+
 use crate::{
     db::user::I2PAddress,
     types::{Hash, PublicKey, Timestamp, Topic},
@@ -79,6 +81,11 @@ impl Scheduler {
         self.heap.retain(|s| s != &schedule);
     }
 
+    /// Clears underlying heap
+    pub fn clear(&mut self) {
+        self.heap.clear();
+    }
+
     /// Returns [`None`] if the schedule is not overdue or if the scheduler is
     /// empty
     pub fn try_next(&mut self) -> Option<Schedule> {
@@ -102,7 +109,11 @@ impl Future for &mut Scheduler {
         match this.delay.as_mut().poll_tick(cx) {
             Poll::Ready(_) => match this.heap.peek() {
                 Some(schedule) if schedule.is_overdue() => Poll::Ready(this.heap.pop().unwrap()),
-                _ => Poll::Pending,
+                _ => {
+                    this.delay.reset();
+                    let _ = this.delay.as_mut().poll_tick(cx);
+                    Poll::Pending
+                }
             },
             Poll::Pending => Poll::Pending,
         }

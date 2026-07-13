@@ -21,6 +21,11 @@ mod content {
 pub use content::fetch_mangadex_chapters::FetchMangadexChapters;
 pub use content::update_content_count::UpdateContentCount;
 
+mod users {
+    pub mod add_address;
+}
+pub use users::add_address::AddAddress;
+
 mod torrent {
     pub mod fetch_torrent_watchers;
     pub mod remove_torrent;

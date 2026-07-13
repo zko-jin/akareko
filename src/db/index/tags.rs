@@ -1,6 +1,6 @@
 use serde::{Deserialize, Serialize, de::DeserializeOwned};
 use std::{fmt::Debug, hash::Hash};
-use surrealdb_types::SurrealValue;
+use surrealdb_types::{File, SurrealValue};
 use uuid::Uuid;
 
 use crate::{
@@ -13,7 +13,13 @@ use crate::{
 pub trait IndexTag: Send + Clone + Debug + PartialEq + Eq + Hash + 'static {
     const TAG: &'static str; // Acts like table name
     const CONTENT_TABLE: &'static str;
-    type ExtraMetadata: Send + Clone + Debug + ToBytes + Serialize + DeserializeOwned + SurrealValue;
+    type ExtraContentMetadata: Send
+        + Clone
+        + Debug
+        + ToBytes
+        + Serialize
+        + DeserializeOwned
+        + SurrealValue;
     type ExternalSourceType: Debug
         + Clone
         + SurrealValue
@@ -48,7 +54,7 @@ impl ToBytes for ChapterExternalSource {
 impl IndexTag for MangaTag {
     const TAG: &'static str = "mangas";
     const CONTENT_TABLE: &'static str = "manga_chapters";
-    type ExtraMetadata = MangaChapter;
+    type ExtraContentMetadata = MangaChapter;
     type ExternalSourceType = ChapterExternalSource;
 
     const EVENT_TYPE: EventType = EventType::Manga;
@@ -86,7 +92,7 @@ impl IndexTag for NoTag {
     const CONTENT_TABLE: &'static str = "";
 
     type ExternalSourceType = ();
-    type ExtraMetadata = ();
+    type ExtraContentMetadata = ();
 
     const EVENT_TYPE: EventType = EventType::Invalid;
     const CONTENT_EVENT_TYPE: EventType = EventType::Invalid;

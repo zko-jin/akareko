@@ -119,5 +119,6 @@ pub enum AkarekoErrors {
     // ==================== Database ====================
     #[from]
     Surreal(surrealdb::Error),
+    NotFound,
     DatabaseNotInitialized,
 }

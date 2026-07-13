@@ -1,5 +1,6 @@
 use freya::prelude::*;
 
+mod add_address;
 mod circular_progress_bar;
 mod content_entry;
 mod layout_button;

@@ -18,6 +18,7 @@ use crate::{
         FullSyncTarget, Repositories,
         index::tags::MangaTag,
         schedule::{Schedule, ScheduleType, Scheduler},
+        user::I2PAddress,
     },
     helpers::b32_from_pub_b64,
     server::{
@@ -187,6 +188,12 @@ impl AppManager {
             _ => return,
         };
 
+        if !config.use_embedded_router() {
+            return;
+        }
+
+        println!("{:?}", config);
+
         let router = init_router(config.sam_tcp_port(), config.sam_udp_port()).await;
 
         tokio::spawn(router);
@@ -338,13 +345,13 @@ impl AppManager {
             .load(async move { Ok(Repositories::initialize(&config).await) });
     }
 
-    pub fn sync(&mut self, schedule: Schedule) {
+    pub fn run_schedule(&mut self, schedule: Schedule) {
         let (Some(pool), Some(db)) = (
             self.resources.client.get_value(),
             self.resources.repositories.get_value(),
         ) else {
             self.scheduler.schedule(schedule);
-            warn!("Could not sync, missing resources");
+            warn!("Could not run schedule, missing resources");
             return;
         };
 
@@ -361,8 +368,8 @@ impl AppManager {
         tokio::spawn(async move {
             let mut client = pool.get_client().await;
 
-            let (server_timestamp, increment) = match schedule.schedule_type {
-                ScheduleType::FullSync(ref pub_key) => {
+            let (server_timestamp, increment) = match &schedule.schedule_type {
+                ScheduleType::FullSync(pub_key) => {
                     let server_timestamp = match client
                         .sync_events(&schedule.address, schedule.last_sync, &db)
                         .await
@@ -389,7 +396,7 @@ impl AppManager {
 
                     (server_timestamp, scheduler_config.full_sync_interval)
                 }
-                ScheduleType::SyncMangaContent(ref hash) => {
+                ScheduleType::SyncMangaContent(hash) => {
                     let filter = db
                         .index()
                         .make_filter::<MangaTag>(&hash, Some(schedule.last_sync - TIME_OFFSET))
@@ -409,11 +416,11 @@ impl AppManager {
 
                     (Timestamp::new(0), Timestamp::new(0))
                 }
-                ScheduleType::SyncPost(ref topic) => {
-                    let filter = db
-                        .make_posts_filter(topic.clone(), Some(schedule.last_sync - TIME_OFFSET))
-                        .await
-                        .unwrap();
+                ScheduleType::SyncPost(_topic) => {
+                    // let filter = db
+                    //     .make_posts_filter(topic.clone(), Some(schedule.last_sync - TIME_OFFSET))
+                    //     .await
+                    //     .unwrap();
 
                     (Timestamp::new(0), Timestamp::new(0))
                 }
@@ -427,6 +434,41 @@ impl AppManager {
             }))
             .unwrap();
         });
+    }
+
+    pub async fn load_schedules(&mut self) {
+        let (Some(db), Some(config)) = (
+            self.resources.repositories.get_value(),
+            self.resources.config.get_value(),
+        ) else {
+            warn!("Could not load schedules, missing resources");
+            return;
+        };
+
+        self.scheduler.clear();
+
+        let targets = db.full_sync_addresses().await.unwrap();
+        let pub_keys = targets
+            .iter()
+            .map(|t| t.pub_key.clone())
+            .collect::<Vec<_>>();
+
+        let users = db.user().get_users(pub_keys).await.unwrap();
+
+        let addresses: Vec<(I2PAddress, FullSyncTarget)> = users
+            .into_iter()
+            .zip(targets)
+            .map(|(u, t)| (u.into_address(), t))
+            .collect();
+
+        for (address, target) in addresses {
+            self.scheduler.schedule(Schedule {
+                when: target.last_sync + config.scheduler_config().full_sync_interval,
+                last_sync: target.last_sync,
+                address,
+                schedule_type: ScheduleType::FullSync(target.pub_key),
+            });
+        }
     }
 
     pub async fn process_events(&mut self) {
@@ -444,11 +486,12 @@ impl AppManager {
                 }
 
                 schedule = &mut self.scheduler => {
-                    self.sync(schedule);
+                    self.run_schedule(schedule);
                 }
 
                 _ = &mut self.resources.i2p_router_config => {
                     self.start_router().await;
+                    self.start_sam_session().await;
                 }
 
                 _ = &mut self.resources.config => {
@@ -465,6 +508,7 @@ impl AppManager {
 
                 _ = &mut self.resources.repositories => {
                     self.start_server();
+                    self.load_schedules().await;
                 }
                 _ = &mut self.resources.torrent_client => {}
                 _ = &mut self.resources.server => {}

@@ -1,6 +1,7 @@
 #![feature(negative_impls)]
 #![feature(auto_traits)]
 
+use cfg_if::cfg_if;
 use clap::Parser;
 use freya::{
     prelude::*,
@@ -102,69 +103,77 @@ fn main() -> Result<(), ()> {
     let _rt = rt.enter();
 
     let (manager, manager_tx) = AppManager::new(radio_station);
+
     let resources = manager.resources();
-    let app = AkarekoApp::new(router, radio_station, resources, settings);
 
-    let manager_tx_tray = manager_tx.clone();
-    let tray_handler = move |ev, mut ctx: RendererContext| match ev {
-        TrayEvent::Icon(TrayIconEvent::Click { .. }) => {
-            // TODO: Deduplicate code
-            let can_open_window = radio_station
-                .write_channel(AppChannel::Window)
-                .window_state
-                .try_add_window(AppWindowType::Main);
+    cfg_if! {
+        if #[cfg(feature = "ui")] {
+            let app = AkarekoApp::new(router, radio_station, resources, settings);
 
-            if can_open_window {
-                let manager_tx = manager_tx_tray.clone();
-                ctx.launch_window(WindowConfig::new_app(app).with_on_close(move |_, _| {
-                    manager_tx.send(Event::RemoveMainWindow).unwrap();
-                    CloseDecision::Close
-                }));
+            let manager_tx_tray = manager_tx.clone();
+            let tray_handler = move |ev, mut ctx: RendererContext| match ev {
+                TrayEvent::Icon(TrayIconEvent::Click { .. }) => {
+                    // TODO: Deduplicate code
+                    let can_open_window = radio_station
+                        .write_channel(AppChannel::Window)
+                        .window_state
+                        .try_add_window(AppWindowType::Main);
+
+                    if can_open_window {
+                        let manager_tx = manager_tx_tray.clone();
+                        ctx.launch_window(WindowConfig::new_app(app).with_on_close(move |_, _| {
+                            manager_tx.send(Event::RemoveMainWindow).unwrap();
+                            CloseDecision::Close
+                        }));
+                    }
+                }
+                TrayEvent::Menu(MenuEvent { id }) if id == "open" => {
+                    let can_open_window = radio_station
+                        .write_channel(AppChannel::Window)
+                        .window_state
+                        .try_add_window(AppWindowType::Main);
+
+                    if can_open_window {
+                        let manager_tx = manager_tx_tray.clone();
+                        ctx.launch_window(WindowConfig::new_app(app).with_on_close(move |_, _| {
+                            manager_tx.send(Event::RemoveMainWindow).unwrap();
+                            CloseDecision::Close
+                        }));
+                    }
+                }
+                TrayEvent::Menu(MenuEvent { id }) if id == "quit" => {
+                    // match &radio_station.peek().torrent_client() {
+                    //     ui::ResourceState::Loaded(client) => {
+                    //         let _ = block_on(client.save(PathBuf::from("./data/torrents")));
+                    //     }
+                    //     _ => {}
+                    // };
+                    ctx.exit();
+                }
+                _ => {}
+            };
+            let mut launch_config = LaunchConfig::new()
+                .with_tray(tray_icon, tray_handler)
+                .with_future(async move |_| {
+                    manager.run_manager().await;
+                })
+                .with_exit_on_close(false);
+
+            if !args.minimized {
+                launch_config =
+                    launch_config.with_window(WindowConfig::new_app(app).with_on_close(move |_, _| {
+                        manager_tx.send(Event::RemoveMainWindow).unwrap();
+                        CloseDecision::Close
+                    }));
             }
-        }
-        TrayEvent::Menu(MenuEvent { id }) if id == "open" => {
-            let can_open_window = radio_station
-                .write_channel(AppChannel::Window)
-                .window_state
-                .try_add_window(AppWindowType::Main);
 
-            if can_open_window {
-                let manager_tx = manager_tx_tray.clone();
-                ctx.launch_window(WindowConfig::new_app(app).with_on_close(move |_, _| {
-                    manager_tx.send(Event::RemoveMainWindow).unwrap();
-                    CloseDecision::Close
-                }));
-            }
+            launch(launch_config);
         }
-        TrayEvent::Menu(MenuEvent { id }) if id == "quit" => {
-            // match &radio_station.peek().torrent_client() {
-            //     ui::ResourceState::Loaded(client) => {
-            //         let _ = block_on(client.save(PathBuf::from("./data/torrents")));
-            //     }
-            //     _ => {}
-            // };
-            ctx.exit();
+        else {
+            let mut manager = Manager::new();
+            let _ = futures::executor::block_on(manager.run_manager());
         }
-        _ => {}
-    };
-    let mut launch_config = LaunchConfig::new()
-        .with_tray(tray_icon, tray_handler)
-        .with_future(async move |_| {
-            let thread_id = std::thread::current().id();
-            println!("Task is running on OS Thread: {:?}", thread_id);
-            manager.run_manager().await;
-        })
-        .with_exit_on_close(false);
-
-    if !args.minimized {
-        launch_config =
-            launch_config.with_window(WindowConfig::new_app(app).with_on_close(move |_, _| {
-                manager_tx.send(Event::RemoveMainWindow).unwrap();
-                CloseDecision::Close
-            }));
     }
-
-    launch(launch_config);
 
     Ok(())
 }

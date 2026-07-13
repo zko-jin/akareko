@@ -30,7 +30,7 @@ impl Component for Manga {
             self.index.hash().clone(),
             GetFollowContent::<MangaTag>::new(),
         ));
-        let cover_query = use_query(Query::new(self.index.out_links().clone(), FetchCover));
+        let cover_query = use_query(Query::new(self.index.clone(), FetchCover::new()));
 
         let mangadex_query = use_query(Query::new(
             self.index.out_links().mangadex.unwrap(),

@@ -46,6 +46,7 @@ impl KeyPair {
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 #[serde(default)]
 pub struct I2PRouterConfig {
+    use_embedded_router: bool,
     sam_tcp_port: u16,
     sam_udp_port: u16,
 }
@@ -53,6 +54,7 @@ pub struct I2PRouterConfig {
 impl Default for I2PRouterConfig {
     fn default() -> Self {
         Self {
+            use_embedded_router: true,
             sam_tcp_port: DEFAULT_SAM_TCP_PORT,
             sam_udp_port: DEFAULT_SAM_UDP_PORT,
         }
@@ -222,6 +224,14 @@ impl I2PRouterConfig {
 
     pub fn set_sam_udp_port(&mut self, port: u16) {
         self.sam_udp_port = port;
+    }
+
+    pub fn use_embedded_router(&self) -> bool {
+        self.use_embedded_router
+    }
+
+    pub fn set_use_embedded_router(&mut self, use_embedded_router: bool) {
+        self.use_embedded_router = use_embedded_router;
     }
 }
 

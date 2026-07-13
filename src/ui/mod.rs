@@ -1,19 +1,12 @@
-use std::convert::Infallible;
-
-use anawt::TorrentClient;
 use freya::{
     prelude::*,
     radio::{RadioChannel, RadioStation},
 };
 
 use crate::{
-    config::{AkarekoConfig, I2PRouterConfig, Settings},
+    config::Settings,
     daemon::resource_state::AppResources,
-    db::{
-        Repositories,
-        index::{Index, tags::IndexTag},
-    },
-    server::client::pool::ClientPool,
+    db::index::{Index, tags::IndexTag},
     ui::{
         components::{layout_button, no_reaction_button},
         icons::ARROW_LEFT_ICON,

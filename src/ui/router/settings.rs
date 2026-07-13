@@ -10,6 +10,7 @@ use crate::{
 pub struct SettingsPage;
 
 const DEFAULT_SAM_TCP_PORT_STR: &'static str = formatcp!("{}", DEFAULT_SAM_TCP_PORT);
+
 impl Component for SettingsPage {
     fn render(&self) -> impl IntoElement {
         let mut new_config = use_state(|| AppResources::get_config().unwrap_ref().clone());

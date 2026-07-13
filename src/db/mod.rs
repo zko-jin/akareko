@@ -1,16 +1,17 @@
+use bytes::Bytes;
+#[cfg(feature = "surrealdb")]
 use skerry::skerry;
-use std::fmt::Debug;
+use std::{env, fmt::Debug};
 
 use serde::{Deserialize, Serialize};
 use surrealdb::{
     Surreal,
     engine::local::{Db, SurrealKv},
+    opt::{Config, capabilities::Capabilities},
 };
 use surrealdb_types::SurrealValue;
-use tracing::info;
+use tracing::{info, warn};
 
-#[cfg(feature = "surrealdb")]
-use crate::db::follow_index::IndexFollowRepository;
 use crate::db::{
     comments::Post,
     follow_index::IndexFollow,
@@ -25,6 +26,8 @@ use crate::{
         user::{User, UserRepository},
     },
 };
+#[cfg(feature = "surrealdb")]
+use crate::{db::follow_index::IndexFollowRepository, errors::RepositoriesRetrieveCoverError};
 use crate::{db::index::content::Content, types::PublicKey};
 
 // ==================== End Imports ====================
@@ -104,6 +107,8 @@ impl FullSyncTarget {
 #[cfg(feature = "surrealdb")]
 #[skerry]
 impl Repositories {
+    const COVER_BUCKET: &'static str = "covers";
+
     /// Use Repositories::initialize() instead, this function is only so we can
     /// run tests without setting a user and in memory
     pub async fn setup(db: Surreal<Db>) -> Self {
@@ -123,11 +128,25 @@ impl Repositories {
             init_query.push_str(&format!("DEFINE TABLE IF NOT EXISTS {};\n", table));
         }
 
-        init_query.push_str(
-            "DEFINE INDEX IF NOT EXISTS eventStamps ON TABLE events FIELDS timestamp, event_type;",
-        );
+        let cwd = env::current_dir().expect("Failed to get current working directory");
+        let cwd_str = cwd
+            .to_str()
+            .expect("Path contains invalid UTF-8")
+            .to_string()
+            + "/database/surreal/buckets/covers";
+        unsafe {
+            env::set_var("SURREAL_BUCKET_FOLDER_ALLOWLIST", &cwd_str);
+        }
+
+        init_query.push_str(&format!(
+            "DEFINE INDEX IF NOT EXISTS eventStamps ON TABLE events FIELDS timestamp, event_type;
+            DEFINE BUCKET IF NOT EXISTS {} BACKEND \"file:{}\";",
+            Self::COVER_BUCKET,
+            cwd_str
+        ));
 
         db.query(init_query).await.unwrap();
+
         Self { db }
     }
 
@@ -139,7 +158,10 @@ impl Repositories {
     }
 
     pub async fn initialize(config: &AkarekoConfig) -> Self {
-        let db: Surreal<Db> = Surreal::new::<SurrealKv>("./database/surreal")
+        let capabilities = Capabilities::default().with_all_experimental_features_allowed();
+        let surreal_config = Config::default().capabilities(capabilities);
+
+        let db: Surreal<Db> = Surreal::new::<SurrealKv>(("./database/surreal", surreal_config))
             .await
             .unwrap();
 
@@ -199,6 +221,32 @@ impl Repositories {
     pub async fn full_sync_addresses(&self) -> Result<Vec<FullSyncTarget>, e![Surreal]> {
         let addresses: Vec<FullSyncTarget> = self.db.select(FullSyncTarget::TABLE_NAME).await?;
         Ok(addresses)
+    }
+
+    pub async fn save_cover(&self, key: &str, bytes: &[u8]) -> Result<(), e![Surreal]> {
+        // TODO: Find a way to not have to clone bytes, not sure if surrealdb allows it
+        let x = self
+            .db
+            .query(format!("f\"{}:/{}\".put($data);", Self::COVER_BUCKET, key))
+            .bind(("data", Bytes::copy_from_slice(bytes)))
+            .await?;
+
+        Ok(())
+    }
+
+    pub async fn retrieve_cover(&self, key: &str) -> Result<Bytes, e![Surreal, NotFound]> {
+        let mut response = self
+            .db
+            .query(format!("f\"{}:/{}\".get();", Self::COVER_BUCKET, key))
+            .await?;
+
+        if let Some(surrealdb_types::Value::Bytes(bytes)) =
+            response.take::<Option<surrealdb_types::Value>>(0)?
+        {
+            Ok(bytes.into_inner())
+        } else {
+            Err(RepositoriesRetrieveCoverError::NotFound)
+        }
     }
 
     pub fn user(&self) -> UserRepository<'_> {
