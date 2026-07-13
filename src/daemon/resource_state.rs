@@ -13,9 +13,10 @@ use crate::{
     config::{AkarekoConfig, I2PRouterConfig},
     db::Repositories,
     server::client::pool::ClientPool,
-    ui::Resource,
 };
 
+pub trait Resource: Clone + Send + 'static {}
+impl<T: Clone + Send + 'static> Resource for T {}
 // ==============================================================================
 //                                ResourceState
 // ==============================================================================
@@ -171,14 +172,24 @@ impl<T: Resource, E: Resource> ResourceStateManager<T, E> {
 
     pub fn unload(&mut self) {
         self.abort_load();
-        *self.state.write() = ResourceState::Pending;
+        cfg_if! {
+            if #[cfg(feature = "ui")] {
+                *self.state.write() = ResourceState::Pending;
+            }
+            else {
+                self.state = ResourceState::Pending;
+            }
+        };
     }
 }
 
 impl<T: Resource, E: Resource> Default for ResourceStateManager<T, E> {
     fn default() -> Self {
         Self {
+            #[cfg(feature = "ui")]
             state: State::create_global(Default::default()),
+            #[cfg(not(feature = "ui"))]
+            state: Default::default(),
             load_hdl: Default::default(),
         }
     }
@@ -198,7 +209,13 @@ impl<T: Resource, E: Resource> Future for &mut ResourceStateManager<T, E> {
 
     fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
         let this = self.get_mut();
-        let state = this.state.peek().clone();
+        cfg_if! {
+            if #[cfg(feature = "ui")] {
+                let state = this.state.peek().clone();
+            } else {
+                let state = this.state.clone();
+            }
+        };
 
         match (state, &mut this.load_hdl) {
             (ResourceState::Loading, Some(hdl)) => match hdl.poll_unpin(cx) {
@@ -206,11 +223,23 @@ impl<T: Resource, E: Resource> Future for &mut ResourceStateManager<T, E> {
                     match v {
                         Ok(Ok(v)) => {
                             this.load_hdl = None;
-                            *this.state.write() = ResourceState::Loaded(v);
+                            cfg_if! {
+                                if #[cfg(feature = "ui")] {
+                                    *this.state.write() = ResourceState::Loaded(v);
+                                } else {
+                                    this.state = ResourceState::Loaded(v);
+                                }
+                            }
                         }
                         Ok(Err(e)) => {
                             this.load_hdl = None;
-                            *this.state.write() = ResourceState::Error(e);
+                            cfg_if! {
+                                if #[cfg(feature = "ui")] {
+                                    *this.state.write() = ResourceState::Error(e);
+                                } else {
+                                    this.state = ResourceState::Error(e);
+                                }
+                            }
                         }
                         Err(_) => todo!(),
                     }

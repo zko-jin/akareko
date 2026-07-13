@@ -13,7 +13,7 @@ use yosemite::{RouterApi, Session, style};
 
 use crate::{
     config::{AkarekoConfig, I2PRouterConfig},
-    daemon::resource_state::{AppResources, AppResourcesManager, ResourceStateManager},
+    daemon::resource_state::{AppResourcesManager, ResourceStateManager},
     db::{
         FullSyncTarget, Repositories,
         index::tags::MangaTag,
@@ -26,18 +26,25 @@ use crate::{
         client::{AkarekoClient, TIME_OFFSET, pool::ClientPool},
     },
     types::Timestamp,
+};
+
+#[cfg(feature = "ui")]
+use crate::{
+    daemon::resource_state::AppResources,
     ui::{AppChannel, AppState},
 };
 
 pub mod resource_state;
 
 pub enum Event {
+    #[cfg(feature = "ui")]
     RemoveMainWindow,
     AddSchedule(Schedule),
 }
 
 pub struct AppManager {
     resources: AppResourcesManager,
+    #[cfg(feature = "ui")]
     state: RadioStation<AppState, AppChannel>,
 
     scheduler: Scheduler,
@@ -154,12 +161,13 @@ impl AppManager {
     }
 
     pub fn new(
-        state: RadioStation<AppState, AppChannel>,
+        #[cfg(feature = "ui")] state: RadioStation<AppState, AppChannel>,
     ) -> (AppManager, tokio::sync::mpsc::UnboundedSender<Event>) {
         let (tx, rx) = tokio::sync::mpsc::unbounded_channel();
 
         let manager = AppManager {
             resources: Default::default(),
+            #[cfg(feature = "ui")]
             state,
             sam_session: Default::default(),
             scheduler: Scheduler::new(),
@@ -476,6 +484,7 @@ impl AppManager {
             tokio::select! {
                 val = self.rx.recv() => {
                     match val.unwrap() {
+                        #[cfg(feature = "ui")]
                         Event::RemoveMainWindow => {
                             self.state.write_channel(AppChannel::Window).window_state.remove_main_window();
                         },

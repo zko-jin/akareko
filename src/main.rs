@@ -17,8 +17,10 @@ use tracing_subscriber::{EnvFilter, Layer, fmt, layer::SubscriberExt, util::Subs
 use crate::{
     config::Settings,
     daemon::{AppManager, Event},
-    ui::{AkarekoApp, AppChannel, AppState, AppWindowType, RouteContext},
 };
+
+#[cfg(feature = "ui")]
+use crate::ui::{AkarekoApp, AppChannel, AppState, AppWindowType, RouteContext};
 
 mod clients;
 mod config;
@@ -69,45 +71,44 @@ fn main() -> Result<(), ()> {
         .build()
         .unwrap();
 
-    let tray_icon = || {
-        const ICON: &'static [u8] = include_bytes!("../assets/tray_icon.ico");
-        let tray_menu = Menu::new();
-        let _ = tray_menu.append(&MenuItem::with_id("open", "Open", true, None));
-        let _ = tray_menu.append(&MenuItem::with_id("quit", "Quit", true, None));
-
-        let (icon, width, height) = {
-            let image = image::load_from_memory(ICON).unwrap().into_rgba8();
-            (image.to_vec(), image.width(), image.height())
-        };
-
-        TrayIconBuilder::new()
-            .with_menu(Box::new(tray_menu))
-            .with_tooltip("Akareko")
-            .with_icon(Icon::from_rgba(icon, width, height).unwrap())
-            .build()
-            .unwrap()
-    };
-
-    let mut app_state = AppState::new();
-    if !args.minimized {
-        app_state.window_state.try_add_window(AppWindowType::Main);
-    }
-    let mut radio_station = RadioStation::<AppState, AppChannel>::create_global(app_state);
-
-    let router = RouteContext::create_global();
-
-    let settings = rt.block_on(Settings::load());
-    let settings = State::create_global(settings);
-
     // Enter the Tokio context so its APIs (channels, timers, etc.) work.
     let _rt = rt.enter();
 
-    let (manager, manager_tx) = AppManager::new(radio_station);
-
-    let resources = manager.resources();
-
     cfg_if! {
         if #[cfg(feature = "ui")] {
+            let tray_icon = || {
+                const ICON: &'static [u8] = include_bytes!("../assets/tray_icon.ico");
+                let tray_menu = Menu::new();
+                let _ = tray_menu.append(&MenuItem::with_id("open", "Open", true, None));
+                let _ = tray_menu.append(&MenuItem::with_id("quit", "Quit", true, None));
+
+                let (icon, width, height) = {
+                    let image = image::load_from_memory(ICON).unwrap().into_rgba8();
+                    (image.to_vec(), image.width(), image.height())
+                };
+
+                TrayIconBuilder::new()
+                    .with_menu(Box::new(tray_menu))
+                    .with_tooltip("Akareko")
+                    .with_icon(Icon::from_rgba(icon, width, height).unwrap())
+                    .build()
+                    .unwrap()
+            };
+
+            let mut app_state = AppState::new();
+            if !args.minimized {
+                app_state.window_state.try_add_window(AppWindowType::Main);
+            }
+            let mut radio_station = RadioStation::<AppState, AppChannel>::create_global(app_state);
+
+            let router = RouteContext::create_global();
+            let settings = rt.block_on(Settings::load());
+            let settings = State::create_global(settings);
+
+            let (manager, manager_tx) = AppManager::new(radio_station);
+
+            let resources = manager.resources();
+
             let app = AkarekoApp::new(router, radio_station, resources, settings);
 
             let manager_tx_tray = manager_tx.clone();
@@ -170,7 +171,7 @@ fn main() -> Result<(), ()> {
             launch(launch_config);
         }
         else {
-            let mut manager = Manager::new();
+            let (manager, _tx) = AppManager::new();
             let _ = futures::executor::block_on(manager.run_manager());
         }
     }

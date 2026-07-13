@@ -107,9 +107,6 @@ pub enum AppChannel {
 
 impl RadioChannel<AppState> for AppChannel {}
 
-pub trait Resource: Clone + Send + 'static {}
-impl<T: Clone + Send + 'static> Resource for T {}
-
 pub struct AppState {
     pub window_state: AppWindowState,
 }
